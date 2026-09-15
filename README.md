@@ -9,33 +9,55 @@ contra tus amigos y competir en la clasificación.
 - **5145 personajes** importados desde `Database.csv` (jugadores, entrenadores,
   managers...) con sus estadísticas (Potencia, Control, Técnica, Presión, Físico,
   Agilidad, Inteligencia).
-- **5024 sprites** ya vinculados automáticamente a sus personajes por nombre.
-- Precio de fichaje calculado a partir de sus estadísticas (según su posición).
-- Sistema de **ligas privadas** con código de invitación para jugar con amigos.
-- **Mercado de fichajes** con filtros (posición, elemento, juego, búsqueda, orden).
+- **4929 sprites** ya vinculados automáticamente a sus personajes por nombre.
+- Precio de fichaje calculado a partir de sus estadísticas (según su posición),
+  mostrado en **euros** (1 punto interno = 100.000€) para que se sienta como un
+  mercado de fichajes real.
+- Sistema de **ligas privadas** con código de invitación para jugar con amigos,
+  con filtro opcional por **temporada** (qué juegos de la saga incluir) y por
+  **personajes scout** (solo scouts, solo con equipo conocido, o todos).
+- **Mercado de fichajes** diario con pujas selladas y filtros (posición,
+  elemento, juego, búsqueda, orden).
+- **Cláusulas de rescisión**: pasado un tiempo, puedes pagar la cláusula de un
+  jugador de otro equipo y robárselo, o subir la tuya propia para protegerte.
 - **Alineación de 11** con reglas de formación (1 portero, 3-5 defensas,
-  3-5 centrocampistas, 1-3 delanteros) y control de presupuesto.
-- **Simulación de jornadas**: el creador de la liga pulsa un botón y se calculan
-  los puntos de todos los equipos según las estadísticas de sus 11 jugadores
-  (con un punto de aleatoriedad, como un partido real).
-- **Clasificación** y detalle de cada jornada jugada.
+  3-5 centrocampistas, 1-3 delanteros), control de presupuesto, y relleno
+  automático del banquillo al cambiar de formación.
+- **Simulación de jornadas** con un motor propio: goles, paradas, robos,
+  despejes, bloqueos, afinidades de equipo y elementos... incluyendo
+  **supertécnicas** (con los nombres reales de las técnicas del juego, cuando
+  las tenemos) que garantizan el resultado de la jugada con una probabilidad baja.
+- **Calendario tipo liga real**: cada jornada sigue un calendario fijo de
+  "todos contra todos" (round-robin) ajustado al número de entrenadores, con un
+  límite de 3 vueltas completas antes de coronar un campeón.
+- **Repetición animada** de cada partido, con jugadores moviéndose por el
+  campo y sonido.
+- **Clasificación** general y clasificaciones individuales (goleadores,
+  asistencias, paradas...) por liga.
+- **Perfil personalizable**: cada usuario puede elegir el sprite de cualquier
+  personaje como su icono.
+- **Panel de administración** (para el creador del sitio) con vista de todas
+  las ligas y capacidad de gestionar la plantilla de cualquier entrenador.
 
 Todo renderizado en el servidor con plantillas HTML (Jinja2) y formularios
-normales — no hace falta saber JavaScript para tocar nada de esto.
+normales — apenas hace falta JavaScript para tocar nada de esto.
 
 ## Estructura del proyecto
 
 ```
 inazuma-fantasy-py/
 ├── app.py              # Rutas de Flask (toda la lógica de la app)
-├── db.py                # Conexión SQLite + creación/siembra de tablas
-├── scoring.py            # Reglas de formación y cálculo de puntos
+├── db.py                # Conexión SQLite + creación/siembra/migraciones de tablas
+├── scoring.py            # Motor de simulación de partidos, formaciones y puntuación
+├── daily_task.py          # Script para la rotación diaria del mercado y jornadas
 ├── requirements.txt
 ├── seed/
 │   └── players.json     # Datos de los 5145 personajes ya procesados
 ├── static/
 │   ├── style.css
-│   └── sprites/          # 5024 imágenes de personajes (.png)
+│   ├── team.js, replay.js # Campo interactivo y repetición animada de partidos
+│   ├── sprites/          # ~4929 imágenes de personajes (.png) — no va en git
+│   └── sounds/            # Sonidos opcionales para la repetición — no va en git
 └── templates/            # Plantillas HTML (Jinja2)
 ```
 
@@ -81,17 +103,6 @@ La primera vez que arranques, Flask creará automáticamente el fichero
 5. Cuando todos tengan sus 11 completos, el **creador de la liga** entra en
    "Jornadas" y pulsa "Jugar jornada X" para simular los puntos.
 6. Consultad la **Clasificación** para ver quién va ganando.
-
-## Notas para producción
-
-- Cambia `app.secret_key` en `app.py` por un valor secreto propio antes de
-  desplegar esto en un servidor público.
-- El servidor de desarrollo de Flask (`python app.py`) **no** está pensado para
-  producción. Si quieres desplegarlo de verdad (por ejemplo en una VPS), usa
-  algo como `gunicorn app:app` detrás de un proxy (nginx, Caddy, etc.).
-- La base de datos es SQLite (un único fichero `inazuma_fantasy.sqlite`),
-  perfecta para jugar entre unos pocos amigos. Si la app creciera mucho,
-  se podría migrar a PostgreSQL sin cambiar demasiado el código.
 
 ## Créditos de los datos
 
