@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Admin · Todas las ligas{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>🛠️ Panel de administración</h1>
+    <p class="muted">{{ total_leagues }} liga{{ 's' if total_leagues != 1 else '' }} · {{ total_users }} usuario{{ 's' if total_users != 1 else '' }} registrado{{ 's' if total_users != 1 else '' }} en total</p>
+  </div>
+</div>
+
+<div class="card">
+  <table class="simple-table">
+    <thead>
+      <tr>
+        <th>Liga</th>
+        <th>Creador</th>
+        <th>Entrenadores</th>
+        <th>Jornada</th>
+        <th>Presupuesto</th>
+        <th>Código</th>
+        <th>Creada</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in leagues %}
+      <tr>
+        <td>{{ l.name }}</td>
+        <td>{{ l.creator_username }}</td>
+        <td>{{ l.member_count }}/{{ l.max_members }}</td>
+        <td>{{ l.current_gameweek }}</td>
+        <td>{{ l.budget|euros }}</td>
+        <td><code>{{ l.invite_code }}</code></td>
+        <td>{{ l.created_at }}</td>
+        <td><a href="{{ url_for('admin_league_detail', league_id=l.id) }}" class="btn btn-secondary">Gestionar</a></td>
+      </tr>
+      {% endfor %}
+      {% if not leagues %}
+      <tr><td colspan="8" class="empty-state">Todavía no se ha creado ninguna liga.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

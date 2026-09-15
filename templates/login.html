@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Iniciar sesión · Inazuma Fantasy{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <form class="card auth-card" method="post">
+    <h1>⚡ Inazuma Fantasy</h1>
+    <p class="auth-subtitle">Ficha a tus personajes favoritos y compite contra tus amigos.</p>
+    <label>Usuario</label>
+    <input name="username" placeholder="Mark Evans" required autofocus>
+    <label>Contraseña</label>
+    <input type="password" name="password" required>
+    <button class="btn btn-primary btn-block" type="submit">Entrar</button>
+    <p class="auth-switch">¿No tienes cuenta? <a href="{{ url_for('register') }}">Regístrate</a></p>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Jornadas · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Jornadas</h1>
+    <p class="muted">
+      {{ league.name }} · Jornada actual: {{ league.current_gameweek }}{% if max_gameweeks %} de {{ max_gameweeks }}{% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+</div>
+
+{% if league.ended %}
+<div class="card" style="border-color: var(--orange);">
+  <h3>🏆 Liga finalizada</h3>
+  <p>Campeón: <strong>{{ champion.team_name if champion else '—' }}</strong>{% if champion %} ({{ champion.total_points }} puntos){% endif %}</p>
+</div>
+{% endif %}
+
+{% if is_creator and not league.ended %}
+<div class="card form-card">
+  <h3>🗓️ Horario automático</h3>
+  <p class="muted">Si has configurado la tarea programada, esta liga funciona sola: de lunes a viernes el mercado rota cada día a las 20:00 (hora española), y viernes, sábado y domingo a esa misma hora se juega una jornada. Los botones de abajo siguen disponibles por si quieres adelantarte manualmente.</p>
+</div>
+
+<form class="card form-card" method="post" action="{{ url_for('resolve_market', league_id=league.id) }}">
+  <h3>🔨 Cerrar el mercado ahora</h3>
+  <p class="muted">Hay {{ market_count }} personajes con pujas abiertas en el mercado de hoy. Al cerrarlo se revela quién ganó cada puja y se abre inmediatamente un mercado nuevo.</p>
+  <button class="btn btn-primary" type="submit">Cerrar mercado y repartir jugadores</button>
+</form>
+
+<form class="card form-card" method="post" action="{{ url_for('advance_gameweek', league_id=league.id) }}">
+  <h3>▶️ Jugar la jornada ahora</h3>
+  <p class="muted">Se calculan los puntos de la alineación titular de cada entrenador con lo que tenga fichado ahora mismo (los que no tengan una alineación válida puntuarán 0 esta jornada). No hace falta cerrar el mercado antes.</p>
+  <button class="btn btn-primary" type="submit">Jugar jornada {{ league.current_gameweek + 1 }}</button>
+</form>
+
+<form class="card form-card" method="post" action="{{ url_for('end_league', league_id=league.id) }}" onsubmit="return confirm('¿Seguro que quieres finalizar la liga ya? No podréis jugar más jornadas.');">
+  <h3>🏁 Finalizar la liga</h3>
+  <p class="muted">Termina la liga ya mismo, aunque no se haya llegado a la jornada {{ max_gameweeks or '—' }}. Se declara campeón a quien vaya primero en la clasificación en ese momento.</p>
+  <button class="btn btn-danger" type="submit">Finalizar liga ahora</button>
+</form>
+{% endif %}
+
+<div class="card">
+  {% if not gameweeks %}
+    <p class="empty-state">Todavía no se ha jugado ninguna jornada.</p>
+  {% else %}
+  <table class="simple-table">
+    <thead><tr><th>Jornada</th><th>Fecha</th><th></th></tr></thead>
+    <tbody>
+      {% for gw in gameweeks %}
+      <tr>
+        <td>Jornada {{ gw.number }}</td>
+        <td>{{ gw.played_at }}</td>
+        <td><a class="btn btn-secondary" href="{{ url_for('gameweek_detail', league_id=league.id, number=gw.number) }}">Ver resultados</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

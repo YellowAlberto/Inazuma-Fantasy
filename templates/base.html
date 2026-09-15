@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Inazuma Fantasy{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="navbar">
+    <a href="{{ url_for('index') }}" class="navbar-brand">⚡ Inazuma Fantasy</a>
+    {% if current_user.id %}
+    <nav class="navbar-links">
+      <a href="{{ url_for('leagues') }}">Mis ligas</a>
+      {% if current_user.is_admin %}<a href="{{ url_for('admin_leagues') }}">🛠️ Admin</a>{% endif %}
+      <span class="navbar-user">👤 {{ current_user.username }}</span>
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost">Salir</a>
+    </nav>
+    {% endif %}
+  </header>
+
+  <main class="page-wrap">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

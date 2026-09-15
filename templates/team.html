@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Mi equipo · {{ league.name }}{% endblock %}
+{% block content %}
+
+{% if show_new_squad_popup %}
+<div class="modal-overlay" id="new-squad-modal">
+  <div class="modal-box">
+    <h2>⚡ ¡Este es tu equipo inicial!</h2>
+    <p class="muted">Te hemos asignado estos {{ squad|length }} jugadores gratis y equilibrados. Puedes cambiar la formación o ir al mercado a fichar más cuando quieras.</p>
+    <div class="modal-player-grid">
+      {% for p in squad %}
+      <div class="modal-player">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
+        {% else %}
+          <div class="modal-player-placeholder">⚽</div>
+        {% endif %}
+        <span class="modal-player-name">{{ p.nombre.split(' ')[0] }}</span>
+        <span class="modal-player-pos">{{ p.posicion }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary btn-block" id="close-new-squad-modal">¡Vamos allá!</button>
+  </div>
+</div>
+<script>
+(function () {
+  var modal = document.getElementById('new-squad-modal');
+  var closeBtn = document.getElementById('close-new-squad-modal');
+  function close() {
+    modal.remove();
+    if (window.history.replaceState) {
+      var url = new URL(window.location.href);
+      url.searchParams.delete('new_squad');
+      window.history.replaceState({}, '', url);
+    }
+  }
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
+</script>
+{% endif %}
+
+<div class="page-header">
+  <div>
+    <h1>Mi equipo</h1>
+    <p class="muted">{{ league.name }} · Gastado: {{ spent|euros }} / {{ league.budget|euros }}{{ ' + ' + bonus_budget|euros + ' de bono' if bonus_budget else '' }} · Restante: <strong>{{ remaining|euros }}</strong></p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('market', league_id=league.id) }}" class="btn btn-primary">🛒 Ir al mercado</a>
+    <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+  </div>
+</div>
+
+{% if not is_valid %}
+  <div class="alert alert-error">
+    {% if missing_msg %}
+      {{ missing_msg }}
+    {% else %}
+      Tu alineación titular todavía no es válida para la formación {{ current_formation }}.
+    {% endif %}
+  </div>
+{% else %}
+  <div class="alert alert-success">¡Alineación titular completa y válida ({{ current_formation }})! Espera a que el creador de la liga cierre el mercado y juegue la jornada.</div>
+{% endif %}
+
+<div class="card form-card">
+  <form id="lineup-form" method="post" action="{{ url_for('save_team', league_id=league.id) }}">
+    <h3>Formación</h3>
+    <p class="muted">Elige tu formación y marca como "Titular" a los {{ total_needed }} jugadores de tu plantilla que quieres alinear ({{ lineup_count }}/{{ total_needed }} marcados ahora mismo).</p>
+    <div class="checkbox-list formation-list">
+      {% for key, shape in formations.items() %}
+      <label class="checkbox-item">
+        <input type="radio" name="formation" value="{{ key }}" {{ 'checked' if key == current_formation else '' }}>
+        {{ key }} <span class="muted">(1 GK, {{ shape.DF }} DF, {{ shape.MF }} MF, {{ shape.FW }} FW)</span>
+      </label>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary" type="submit">Guardar alineación</button>
+  </form>
+
+  {% if pitch_rows %}
+  <div class="card-divider"></div>
+  <h3>Alineación en el campo ({{ current_formation }})</h3>
+  <p class="muted">Haz clic en un jugador del campo para cambiarlo por un suplente de su misma posición.</p>
+  <div class="pitch">
+    <div class="pitch-halfway-line"></div>
+    <div class="pitch-center-circle"></div>
+    <div class="pitch-box pitch-box-top"></div>
+    <div class="pitch-box pitch-box-bottom"></div>
+    {% for row in pitch_rows %}
+    <div class="pitch-row">
+      {% for p in row.slots %}
+      {% if p %}
+      <div class="pitch-player" title="Clic para cambiar" data-player-id="{{ p.id }}" data-position="{{ p.posicion }}">
+        <div class="pitch-player-badge">
+          {% if p.sprite_url %}
+            <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
+          {% else %}
+            <span class="pitch-player-placeholder">⚽</span>
+          {% endif %}
+        </div>
+        <span class="pitch-player-name">{{ p.nombre.split(' ')[0] }}</span>
+      </div>
+      {% else %}
+      <div class="pitch-player pitch-slot-empty" title="Clic para añadir" data-position="{{ row.position }}">
+        <div class="pitch-player-badge pitch-player-badge-empty">
+          <span class="pitch-player-placeholder">❓</span>
+        </div>
+        <span class="pitch-player-name">Vacío</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script type="application/json" id="squad-data">{{ squad | tojson }}</script>
+<script src="{{ url_for('static', filename='team.js') }}" defer></script>
+
+<div class="card form-card affinity-tip">
+  <h3>🔥 Afinidad de equipo</h3>
+  <p class="muted">Si 4 o más titulares comparten el mismo arquetipo, ganan +1 punto extra cada uno esa jornada (con 6 o más, +2), y además se activa un efecto especial en el partido:</p>
+  <ul class="affinity-effects-list">
+    <li><strong>Justicia</strong> — defensa más sólida: el rival tiene menos probabilidad de marcaros.</li>
+    <li><strong>Contraataque</strong> — más letales al contragolpe cuando tenéis menos posesión que el rival.</li>
+    <li><strong>Juego Sucio</strong> — presión más agresiva: ganáis más robos de balón.</li>
+    <li><strong>Tensión</strong> — rendís mejor en los últimos 20 minutos del partido.</li>
+    <li><strong>Afinidad</strong> — mejor conexión entre compañeros: más pases clave.</li>
+    <li><strong>Brecha</strong> — leéis mejor el juego defensivo: más despejes e intercepciones.</li>
+  </ul>
+  <p class="muted">El arquetipo de cada jugador aparece en su tarjeta.</p>
+</div>
+
+<div class="card form-card affinity-tip">
+  <h3>🔒 Cláusulas de rescisión</h3>
+  <p class="muted">Cada jugador de tu plantilla tiene una cláusula (empieza en 1.5x su valor). Puedes pagar de tu propio presupuesto para subirla y protegerlo de que te lo roben. A partir de que la liga lleve una semana creada, cualquier entrenador puede pagar la cláusula de un jugador de OTRO equipo (desde la clasificación) y llevárselo al instante a su plantilla.</p>
+</div>
+
+<h2 class="section-title">Tu plantilla ({{ squad|length }} jugadores)</h2>
+<p class="muted">Pasa el ratón sobre un jugador para ver sus puntos por jornada. Haz clic en una jornada para ver las estadísticas de ese partido.</p>
+<div class="player-grid">
+  {% for p in squad %}
+  <div class="player-card-wrap">
+    <div class="player-card {{ 'player-card-starter' if p.in_lineup else '' }}">
+      <div class="player-card-top">
+        <span class="player-position-badge">{{ p.posicion }}</span>
+        <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
+      </div>
+      <div class="player-sprite-wrap">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+        {% else %}
+          <div class="player-sprite player-sprite-placeholder">⚽</div>
+        {% endif %}
+      </div>
+      <div class="player-card-body">
+        <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+        <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+        {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+        {% if p.history %}<span class="player-history-hint">📊 {{ p.history|length }} jornada{{ 's' if p.history|length != 1 else '' }} jugada{{ 's' if p.history|length != 1 else '' }}</span>{% endif %}
+        <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
+        <label class="checkbox-item lineup-toggle">
+          <input type="checkbox" name="player_ids" value="{{ p.id }}" form="lineup-form" {{ 'checked' if p.in_lineup else '' }}>
+          Titular
+        </label>
+      </div>
+      <form method="post" action="{{ url_for('increase_clause', league_id=league.id, player_id=p.id) }}" class="clause-form">
+        <input type="number" name="amount" min="0.1" step="0.1" placeholder="Subir +M €">
+        <button class="btn btn-secondary" type="submit">Subir cláusula</button>
+      </form>
+      <form method="post" action="{{ url_for('drop_player', league_id=league.id, player_id=p.id) }}">
+        <button class="btn btn-danger btn-block" type="submit">Liberar de la plantilla</button>
+      </form>
+    </div>
+
+    {% if p.history %}
+    <div class="player-history-popup">
+      <h4>{{ p.nombre }} — puntos por jornada</h4>
+      <ul>
+        {% for h in p.history|reverse %}
+        <li>
+          <a href="{{ url_for('gameweek_detail', league_id=league.id, number=h.number) }}">
+            <span>Jornada {{ h.number }}</span>
+            <strong>{{ h.points }} pts</strong>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if not squad %}
+    <p class="empty-state">Tu plantilla está vacía. Ve al mercado para pujar por tus primeros jugadores.</p>
+  {% endif %}
+</div>
+{% endblock %}

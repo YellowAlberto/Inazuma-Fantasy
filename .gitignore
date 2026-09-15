@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+.env
+venv/
+.DS_Store
+
+# Los sprites pesan ~57MB y no cambian casi nunca — súbelos a PythonAnywhere
+# una sola vez por separado (como ya hiciste) en vez de meterlos en git.
+static/sprites/
+static/sprites.zip
+static/sounds.zip

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Clasificación · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Clasificación</h1>
+    <p class="muted">{{ league.name }} · Jornada actual: {{ league.current_gameweek }}</p>
+  </div>
+  <a href="{{ url_for('leaderboards', league_id=league.id) }}" class="btn btn-secondary">📊 Clasificaciones individuales</a>
+  <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+</div>
+
+<div class="card">
+  <table class="simple-table">
+    <thead><tr><th>#</th><th>Equipo</th><th>Entrenador</th><th>Puntos</th></tr></thead>
+    <tbody>
+      {% for s in standings %}
+      <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
+        <td>{{ loop.index }}</td>
+        <td><a href="{{ url_for('view_member_team', league_id=league.id, user_id=s.user_id) }}">{{ s.team_name }}</a></td>
+        <td>{{ s.username }}</td>
+        <td><strong>{{ s.total_points }}</strong></td>
+      </tr>
+      {% endfor %}
+      {% if not standings %}
+      <tr><td colspan="4" class="empty-state">Todavía no se ha jugado ninguna jornada.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

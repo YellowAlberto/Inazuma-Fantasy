@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Inazuma Fantasy · Fantasy football con Inazuma Eleven{% endblock %}
+{% block content %}
+
+<div class="home-hero">
+  <h1>⚡ Inazuma Fantasy</h1>
+  <p class="home-hero-tagline">Tu propio fantasy football con los personajes de Inazuma Eleven. Crea liga con tus amigos, fichas tu equipo, y cada jornada se juega solo.</p>
+  <div class="home-hero-actions">
+    {% if current_user.id %}
+      <a href="{{ url_for('leagues') }}" class="btn btn-primary">Ir a mis ligas</a>
+    {% else %}
+      <a href="{{ url_for('register') }}" class="btn btn-primary">Crear una cuenta</a>
+      <a href="{{ url_for('login') }}" class="btn btn-secondary">Iniciar sesión</a>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="section-title">¿Cómo funciona?</h2>
+<div class="home-steps">
+  <div class="card">
+    <div class="home-step-number">1</div>
+    <h3>Crea o únete a una liga</h3>
+    <p class="muted">Crea una liga con tus amigos (eliges presupuesto, temporadas incluidas y si quieres personajes scout o no) y comparte el código de invitación. Al entrar recibes un equipo inicial gratis y equilibrado.</p>
+  </div>
+  <div class="card">
+    <div class="home-step-number">2</div>
+    <h3>Ficha tu plantilla</h3>
+    <p class="muted">Cada día se abre un mercado nuevo con 22 personajes disponibles. Puja por los que quieras — la puja más alta se los lleva cuando se cierra el mercado. Elige formación y marca tu once titular.</p>
+  </div>
+  <div class="card">
+    <div class="home-step-number">3</div>
+    <h3>Cada jornada se juega sola</h3>
+    <p class="muted">Los partidos se simulan automáticamente con un motor propio: goles, paradas, robos, bloqueos, afinidades de equipo... incluso <strong>supertécnicas</strong> con los nombres reales del juego. Sigue un calendario real de todos-contra-todos, así que siempre sabes a quién te enfrentas.</p>
+  </div>
+  <div class="card">
+    <div class="home-step-number">4</div>
+    <h3>Sube en la clasificación</h3>
+    <p class="muted">Cada jugador puntúa según lo que haga en el partido (goles, asistencias, paradas...). Revive cada jornada con una repetición animada del partido, y compite por ser el mejor entrenador de la liga.</p>
+  </div>
+</div>
+
+<h2 class="section-title">Algunas cosas que te vas a encontrar</h2>
+<div class="home-features">
+  <div class="card home-feature">
+    <span class="home-feature-icon">✨</span>
+    <div>
+      <h3>Supertécnicas</h3>
+      <p class="muted">Con una probabilidad baja los jugadores podrán hacer supertécnicas, lo cual les garantizará el resultado de la jugada.</p>
+    </div>
+  </div>
+  <div class="card home-feature">
+    <span class="home-feature-icon">🔨</span>
+    <div>
+      <h3>Cláusulas de rescisión</h3>
+      <p class="muted">Pasado un tiempo, puedes pagar la cláusula de un jugador de otro equipo y robárselo — o subir la tuya propia para protegerte.</p>
+    </div>
+  </div>
+  <div class="card home-feature">
+    <span class="home-feature-icon">🎬</span>
+    <div>
+      <h3>Repetición animada</h3>
+      <p class="muted">Cada partido se puede reproducir con jugadores moviéndose por el campo, sonido y todo, no solo un marcador frío.</p>
+    </div>
+  </div>
+  <div class="card home-feature">
+    <span class="home-feature-icon">🗓️</span>
+    <div>
+      <h3>Elige tu temporada</h3>
+      <p class="muted">Elige qué juegos de la saga quieres incluir, y si quieres jugar solo con scout, solo con los de equipo conocido, o con todos.</p>
+    </div>
+  </div>
+</div>
+
+<div class="home-footer">
+  <p class="muted">Creado por <strong>YellowAlberto</strong> con Claude.</p>
+</div>
+
+{% endblock %}

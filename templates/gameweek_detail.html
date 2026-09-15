@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Jornada {{ gameweek.number }} · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Jornada {{ gameweek.number }}</h1>
+    <p class="muted">{{ league.name }}</p>
+  </div>
+  <a href="{{ url_for('gameweeks', league_id=league.id) }}" class="btn btn-ghost">← Todas las jornadas</a>
+</div>
+
+<h2 class="section-title">Partidos de la jornada</h2>
+{% for f in fixtures %}
+<div class="card fixture-card">
+  <div class="fixture-score">
+    <span class="fixture-team">{{ f.home_label }}</span>
+    {% if f.events %}
+      <span class="fixture-goals" id="score-fx{{ f.id }}" data-home-goals="{{ f.home_goals }}" data-away-goals="{{ f.away_goals }}">0 — 0</span>
+    {% else %}
+      <span class="fixture-goals">{{ f.home_goals }} — {{ f.away_goals }}</span>
+    {% endif %}
+    <span class="fixture-team">{{ f.away_label }}{{ ' 🤖' if not f.away_user_id else '' }}</span>
+  </div>
+  {% if f.events %}
+    <p class="muted fixture-points" id="points-fx{{ f.id }}" data-home-label="{{ f.home_label }}" data-away-label="{{ f.away_label }}" data-home-points="{{ f.home_points }}" data-away-points="{{ f.away_points }}">Puntos fantasy: se revelan al terminar el partido — dale a reproducir 👇</p>
+  {% else %}
+    <p class="muted">Puntos fantasy: {{ f.home_label }} {{ f.home_points }} · {{ f.away_label }} {{ f.away_points }}</p>
+  {% endif %}
+
+  {% if f.events %}
+  <div class="replay" data-fixture="fx{{ f.id }}" data-home-label="{{ f.home_label }}" data-away-label="{{ f.away_label }}">
+    <div class="replay-header">
+      <span class="replay-clock">Min 0'</span>
+    </div>
+    <div class="replay-pitch">
+      <div class="replay-goal replay-goal-left"></div>
+      <div class="replay-goal replay-goal-right"></div>
+      <div class="goal-flash goal-flash-left"></div>
+      <div class="goal-flash goal-flash-right"></div>
+      <div class="replay-halfway"></div>
+      <div class="replay-center-circle"></div>
+
+      {% for p in f.pitch_home %}
+      <div class="pitch-mini-player" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="home"
+           style="left: {{ p.x }}%; top: {{ p.y }}%; --wobble-delay: {{ (p.id % 23) / 10 }}s;" title="{{ p.nombre }}">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
+        {% else %}
+          <span class="pitch-mini-placeholder">⚽</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% for p in f.pitch_away %}
+      <div class="pitch-mini-player pitch-mini-player-away" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="away"
+           style="left: {{ p.x }}%; top: {{ p.y }}%; --wobble-delay: {{ (p.id % 19) / 10 }}s;" title="{{ p.nombre }}">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
+        {% else %}
+          <span class="pitch-mini-placeholder">⚽</span>
+        {% endif %}
+      </div>
+      {% endfor %}
+
+      <div class="replay-ball">⚽</div>
+    </div>
+    <p class="replay-caption">Pulsa reproducir para ver la repetición del partido.</p>
+    <div class="replay-controls">
+      <button type="button" class="btn btn-secondary replay-play">▶️ Reproducir</button>
+      <button type="button" class="btn btn-ghost replay-restart">🔁 Reiniciar</button>
+      <button type="button" class="btn btn-ghost replay-mute" title="Silenciar/activar sonido">🔊</button>
+    </div>
+  </div>
+  <script type="application/json" class="replay-events-data" data-fixture="fx{{ f.id }}">{{ f.events | tojson }}</script>
+  {% endif %}
+
+  {% if f.summary_lines %}
+  <details class="match-summary-details">
+    <summary>Ver resumen en texto</summary>
+    <div class="match-summary">
+      {% for line in f.summary_lines %}
+        <p class="match-summary-line">{{ line }}</p>
+      {% endfor %}
+    </div>
+  </details>
+  {% else %}
+    <p class="muted">Partido sin ocasiones destacadas.</p>
+  {% endif %}
+</div>
+{% endfor %}
+{% if not fixtures %}
+<div class="card"><p class="empty-state">No hubo partidos registrados esta jornada.</p></div>
+{% endif %}
+
+<h2 class="section-title">Puntos fantasy por equipo</h2>
+<div class="card">
+  <table class="simple-table">
+    <thead><tr><th>#</th><th>Equipo</th><th>Entrenador</th><th>Puntos</th></tr></thead>
+    <tbody>
+      {% for t in totals %}
+      <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
+        <td>{{ loop.index }}</td>
+        <td>{{ t.team_name }}</td>
+        <td>{{ t.username }}</td>
+        <td><strong>{{ t.total_points }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="section-title">Alineaciones y puntos individuales</h2>
+{% for t in totals %}
+<div class="card lineup-card">
+  <h3>{{ t.team_name }} <span class="muted">({{ t.username }}) · {{ t.total_points }} pts</span></h3>
+  <div class="mini-player-list">
+    {% for s in lineups.get(t.user_id, []) %}
+    <div class="mini-player">
+      {% if s.sprite_url %}
+        <img src="{{ s.sprite_url }}" alt="{{ s.nombre }}">
+      {% else %}
+        <div class="mini-player-placeholder">⚽</div>
+      {% endif %}
+      <span class="mini-player-name">{{ s.nombre }}</span>
+      <span class="mini-player-pos">{{ s.posicion }}</span>
+      <span class="mini-player-pts">{{ s.points }} pts</span>
+      {% if s.events %}
+      <div class="mini-player-events">
+        {% for ev in s.events.split('|') %}
+          <span class="event-tag">{{ ev }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+{% if market_results %}
+<h2 class="section-title">Mercado de esa semana: quién ganó cada puja</h2>
+<div class="card">
+  <table class="simple-table">
+    <thead><tr><th>Jugador</th><th>Posición</th><th>Ganador</th><th>Importe</th></tr></thead>
+    <tbody>
+      {% for r in market_results %}
+      <tr>
+        <td>{{ r.nombre }}</td>
+        <td>{{ r.posicion }}</td>
+        <td>{{ r.team_name or ('🤖 CPU (fuera de la liga)' if r.winner_user_id == -1 else '— sin pujas —') }}</td>
+        <td>{{ r.amount|int if r.amount else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+<script src="{{ url_for('static', filename='replay.js') }}" defer></script>
+{% endblock %}

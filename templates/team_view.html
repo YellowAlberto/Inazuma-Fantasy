@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}{{ team_name }} · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ team_name }}</h1>
+    <p class="muted">{{ league.name }} · Entrenador: {{ username }} · Formación {{ current_formation }} · Gastado: {{ spent }}</p>
+  </div>
+  <a href="{{ url_for('standings', league_id=league.id) }}" class="btn btn-ghost">← Volver a la clasificación</a>
+</div>
+
+{% if not can_buy_clause %}
+<div class="alert alert-error">Las cláusulas no se pueden pagar hasta que la liga lleve al menos {{ clause_age_days }} días creada.</div>
+{% endif %}
+
+{% if pitch_rows %}
+<div class="card pitch-card">
+  <h3>Alineación titular</h3>
+  <div class="pitch">
+    <div class="pitch-halfway-line"></div>
+    <div class="pitch-center-circle"></div>
+    <div class="pitch-box pitch-box-top"></div>
+    <div class="pitch-box pitch-box-bottom"></div>
+    {% for row in pitch_rows %}
+    <div class="pitch-row">
+      {% for p in row.slots %}
+      {% if p %}
+      <div class="pitch-player pitch-player-readonly" title="{{ p.nombre }}">
+        <div class="pitch-player-badge">
+          {% if p.sprite_url %}
+            <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
+          {% else %}
+            <span class="pitch-player-placeholder">⚽</span>
+          {% endif %}
+        </div>
+        <span class="pitch-player-name">{{ p.nombre.split(' ')[0] }}</span>
+      </div>
+      {% else %}
+      <div class="pitch-player pitch-slot-empty pitch-player-readonly">
+        <div class="pitch-player-badge pitch-player-badge-empty">
+          <span class="pitch-player-placeholder">❓</span>
+        </div>
+        <span class="pitch-player-name">Vacío</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<h2 class="section-title">Plantilla completa ({{ squad|length }} jugadores)</h2>
+<div class="player-grid">
+  {% for p in squad %}
+  <div class="player-card {{ 'player-card-starter' if p.in_lineup else '' }}">
+    <div class="player-card-top">
+      <span class="player-position-badge">{{ p.posicion }}</span>
+      <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
+    </div>
+    <div class="player-sprite-wrap">
+      {% if p.sprite_url %}
+        <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+      {% else %}
+        <div class="player-sprite player-sprite-placeholder">⚽</div>
+      {% endif %}
+    </div>
+    <div class="player-card-body">
+      <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+      <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+      {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+      {% if p.in_lineup %}<span class="player-archetype" style="background: var(--orange); color: #1a0d00;">Titular</span>{% endif %}
+      <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
+    </div>
+    {% if can_buy_clause %}
+    <form method="post" action="{{ url_for('buy_clause', league_id=league.id, player_id=p.id) }}"
+          onsubmit="return confirm('¿Pagar {{ p.clause_value|euros }} de presupuesto para robar a {{ p.nombre }}?');">
+      <button class="btn btn-primary btn-block" type="submit">Pagar cláusula y robarlo</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if not squad %}
+    <p class="empty-state">Este equipo todavía no tiene ningún jugador.</p>
+  {% endif %}
+</div>
+{% endblock %}

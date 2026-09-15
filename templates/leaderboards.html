@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Clasificaciones individuales · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Clasificaciones individuales</h1>
+    <p class="muted">{{ league.name }} · Estadísticas acumuladas de todas las jornadas jugadas</p>
+  </div>
+  <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+</div>
+
+<div class="leaderboard-grid">
+  {% for cat in categories %}
+  <div class="card leaderboard-card">
+    <h3>{{ cat.label }}</h3>
+    {% if cat.rows %}
+    <table class="simple-table">
+      <tbody>
+        {% for r in cat.rows %}
+        <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
+          <td class="leaderboard-rank">{{ loop.index }}</td>
+          <td class="leaderboard-player">
+            {% if r.sprite_url %}
+              <img src="{{ r.sprite_url }}" alt="{{ r.nombre }}" class="leaderboard-avatar">
+            {% else %}
+              <span class="leaderboard-avatar leaderboard-avatar-placeholder">⚽</span>
+            {% endif %}
+            <span>
+              <strong>{{ r.nombre }}</strong>
+              <span class="muted">· {{ position_labels[r.posicion] }}</span><br>
+              <span class="leaderboard-owner">{{ r.owner_team_name if r.owner_team_name else 'Libre en el mercado' }}</span>
+            </span>
+          </td>
+          <td class="leaderboard-total">{{ r.total|int }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">Todavía no hay datos en esta categoría.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

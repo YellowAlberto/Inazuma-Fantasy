@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Mercado de pujas · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Mercado semanal (puja)</h1>
+    <p class="muted">{{ league.name }} · Gastado en plantilla: {{ spent|euros }} · Comprometido en pujas: {{ committed|euros }}{{ ' · Bono acumulado: ' + bonus_budget|euros if bonus_budget else '' }} · Disponible: <strong>{{ available|euros }}</strong></p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">Ver mi equipo</a>
+    <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+  </div>
+</div>
+
+{% if market_resolved %}
+  <div class="alert alert-error">El mercado de esta semana ya se ha cerrado. Espera a que se juegue la jornada para ver un mercado nuevo.</div>
+{% else %}
+  <p class="muted">Este mercado tiene {{ players|length }} personajes disponibles esta semana. Puja lo que quieras (como mínimo su valor actual). Puja sellada: no ves lo que pujan los demás. Cuando el creador de la liga cierre el mercado, se revelará quién ha ganado cada puja.</p>
+{% endif %}
+
+<form class="card filter-bar" method="get">
+  <select name="posicion">
+    <option value="">Todas las posiciones</option>
+    {% for pos, label in position_labels.items() %}
+      <option value="{{ pos }}" {{ 'selected' if posicion == pos else '' }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="arquetipo">
+    <option value="">Todos los arquetipos</option>
+    {% for a in arquetipos %}
+      <option value="{{ a }}" {{ 'selected' if arquetipo == a else '' }}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <select name="sort">
+    <option value="posicion" {{ 'selected' if sort == 'posicion' else '' }}>Orden: posición</option>
+    <option value="valor_desc" {{ 'selected' if sort == 'valor_desc' else '' }}>Valor: mayor a menor</option>
+    <option value="valor_asc" {{ 'selected' if sort == 'valor_asc' else '' }}>Valor: menor a mayor</option>
+    <option value="puntos_desc" {{ 'selected' if sort == 'puntos_desc' else '' }}>Más puntos hechos</option>
+    <option value="nombre" {{ 'selected' if sort == 'nombre' else '' }}>Nombre A-Z</option>
+  </select>
+  <button class="btn btn-primary" type="submit">Filtrar</button>
+</form>
+
+<div class="player-grid">
+  {% for p in players %}
+  <div class="player-card">
+    <div class="player-card-top">
+      <span class="player-position-badge">{{ p.posicion }}</span>
+      <span class="player-price">Valor: {{ (p.market_value or p.price)|euros }}</span>
+    </div>
+    <div class="player-sprite-wrap">
+      {% if p.sprite_url %}
+        <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+      {% else %}
+        <div class="player-sprite player-sprite-placeholder">⚽</div>
+      {% endif %}
+    </div>
+    <div class="player-card-body">
+      <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+      <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+      {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+      <div class="player-meta player-meta-small">{{ p.juego | display_season }}</div>
+      <div class="player-meta player-meta-small">🏆 {{ p.total_points }} pts hechos</div>
+      {% if p.seller_team_name %}
+        <div class="player-meta player-meta-small">Vendido por: <strong>{{ p.seller_team_name }}</strong></div>
+      {% endif %}
+      {% if p.has_cpu_offer %}
+        <div class="cpu-offer-hint">📡 Hay interés de fuera de la liga por este jugador</div>
+      {% endif %}
+    </div>
+    {% if not market_resolved %}
+    <form method="post" action="{{ url_for('place_bid', league_id=league.id, player_id=p.id) }}" class="bid-form">
+      <input type="hidden" name="posicion" value="{{ posicion }}">
+      <input type="hidden" name="arquetipo" value="{{ arquetipo }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="number" step="0.1" min="{{ p.min_bid|euromillions }}" name="amount" placeholder="Mín. {{ p.min_bid|euromillions }}M €" value="{{ p.my_bid|euromillions if p.my_bid else '' }}" required>
+      <button class="btn btn-primary btn-block" type="submit">{{ 'Actualizar puja' if p.my_bid else 'Pujar' }}</button>
+    </form>
+    {% if p.my_bid %}
+    <form method="post" action="{{ url_for('cancel_bid', league_id=league.id, player_id=p.id) }}">
+      <input type="hidden" name="posicion" value="{{ posicion }}">
+      <input type="hidden" name="arquetipo" value="{{ arquetipo }}">
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <button class="btn btn-danger btn-block" type="submit">Cancelar puja ({{ p.my_bid|euros }})</button>
+    </form>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Admin · {{ member.team_name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('admin_league_detail', league_id=league.id) }}" class="muted">&larr; {{ league.name }}</a>
+    <h1>🛠️ {{ member.team_name }}</h1>
+    <p class="muted">Entrenador: {{ member.username }} · {{ roster|length }} jugadores en plantilla</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Añadir jugador</h3>
+  <p class="muted">Se añade gratis, directamente a la plantilla, sin pasar por el mercado.</p>
+  <form method="get" action="{{ url_for('admin_member_roster', league_id=league.id, user_id=member.user_id) }}" class="form-card" style="flex-direction:row; gap:8px; align-items:flex-end;">
+    <div style="flex-grow:1;">
+      <label>Buscar por nombre</label>
+      <input type="text" name="q" value="{{ query }}" placeholder="Ej. Mark Evans" autofocus>
+    </div>
+    <button class="btn btn-primary" type="submit">Buscar</button>
+  </form>
+
+  {% if query %}
+    {% if search_results %}
+    <div class="player-grid" style="margin-top:16px;">
+      {% for p in search_results %}
+      <div class="player-card">
+        <div class="player-card-top">
+          <span class="player-position-badge">{{ p.posicion }}</span>
+        </div>
+        <div class="player-sprite-wrap">
+          {% if p.sprite_url %}
+            <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+          {% else %}
+            <div class="player-sprite player-sprite-placeholder">⚽</div>
+          {% endif %}
+        </div>
+        <div class="player-card-body">
+          <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+          <div class="player-meta">{{ position_labels[p.posicion] }}</div>
+          <form method="post" action="{{ url_for('admin_add_player', league_id=league.id, user_id=member.user_id) }}">
+            <input type="hidden" name="player_id" value="{{ p.id }}">
+            <input type="hidden" name="q" value="{{ query }}">
+            <button class="btn btn-primary btn-block" type="submit">➕ Añadir</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state" style="margin-top:16px;">Sin resultados para "{{ query }}" (o ya está en esta plantilla).</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<h2 class="section-title">Plantilla actual</h2>
+<div class="player-grid">
+  {% for p in roster %}
+  <div class="player-card">
+    <div class="player-card-top">
+      <span class="player-position-badge">{{ p.posicion }}</span>
+      <span class="player-price">Cláusula: {{ p.clause_value|euros }}</span>
+    </div>
+    <div class="player-sprite-wrap">
+      {% if p.sprite_url %}
+        <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+      {% else %}
+        <div class="player-sprite player-sprite-placeholder">⚽</div>
+      {% endif %}
+    </div>
+    <div class="player-card-body">
+      <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+      <div class="player-meta">{{ position_labels[p.posicion] }}</div>
+      <form method="post" action="{{ url_for('admin_remove_player', league_id=league.id, user_id=member.user_id) }}" onsubmit="return confirm('¿Quitar a {{ p.nombre }} de este equipo?');">
+        <input type="hidden" name="player_id" value="{{ p.id }}">
+        <button class="btn btn-danger btn-block" type="submit">Quitar</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+  {% if not roster %}
+  <p class="empty-state">Este entrenador no tiene ningún jugador todavía.</p>
+  {% endif %}
+</div>
+{% endblock %}

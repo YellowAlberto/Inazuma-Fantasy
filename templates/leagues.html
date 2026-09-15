@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Mis ligas · Inazuma Fantasy{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Mis ligas</h1>
+</div>
+
+<div class="league-grid">
+  {% if not leagues %}
+    <p class="empty-state">Aún no estás en ninguna liga. ¡Crea una o únete con un código más abajo!</p>
+  {% endif %}
+  {% for l in leagues %}
+    <a href="{{ url_for('league_detail', league_id=l.id) }}" class="card league-card">
+      <h3>{{ l.name }}</h3>
+      <p>Tu equipo: <strong>{{ l.my_team_name }}</strong></p>
+      <p>{{ l.member_count }}/{{ l.max_members }} entrenador{{ 'es' if l.member_count != 1 else '' }} · Jornada {{ l.current_gameweek }}</p>
+      <p class="league-code">Código: {{ l.invite_code }}</p>
+    </a>
+  {% endfor %}
+</div>
+
+<h2 class="section-title">{{ 'Crear otra liga o unirte con un código' if leagues else 'Crear o unirte a una liga' }}</h2>
+<div class="two-col">
+  <form class="card form-card" method="post" action="{{ url_for('create_league') }}">
+    <h3>Crear una liga</h3>
+    <label>Nombre de la liga</label>
+    <input name="name" placeholder="Liga Raimon" required>
+    <label>Nombre de tu equipo</label>
+    <input name="team_name" placeholder="Los Invencibles" required>
+    <label>Presupuesto (millones de €)</label>
+    <input type="number" name="budget" value="80" min="10" max="500" step="1">
+    <label>Temporadas incluidas (ninguna marcada = todas)</label>
+    <div class="checkbox-list">
+      {% for s in all_seasons %}
+      <label class="checkbox-item">
+        <input type="checkbox" name="seasons" value="{{ s }}">
+        {{ season_labels_es.get(s, s) }} <span class="season-count" data-season="{{ s }}">({{ season_counts.get(s, 0) }} jugadores)</span>
+      </label>
+      {% endfor %}
+    </div>
+    <label>Personajes scout (sin equipo conocido)</label>
+    <select name="scout_filter" id="scout-filter-select">
+      <option value="all">Todos los personajes</option>
+      <option value="exclude">Sin scouts ({{ non_scout_count }} jugadores)</option>
+      <option value="only">Solo scouts ({{ scout_count }} jugadores)</option>
+    </select>
+    <button class="btn btn-primary" type="submit">Crear liga</button>
+    <p class="muted">Al crear la liga se te asignará automáticamente un equipo inicial equilibrado.</p>
+  </form>
+
+  <form class="card form-card" method="post" action="{{ url_for('join_league') }}">
+    <h3>Unirme con un código</h3>
+    <label>Código de invitación</label>
+    <input name="invite_code" placeholder="ABC123" required style="text-transform:uppercase">
+    <label>Nombre de tu equipo</label>
+    <input name="team_name" placeholder="Tu equipo" required>
+    <button class="btn btn-secondary" type="submit">Unirme</button>
+  </form>
+</div>
+
+<script type="application/json" id="season-counts-by-scout-filter">{{ season_counts_by_scout_filter | tojson }}</script>
+<script>
+(function () {
+  var data = JSON.parse(document.getElementById('season-counts-by-scout-filter').textContent);
+  var select = document.getElementById('scout-filter-select');
+  if (!select) return;
+  select.addEventListener('change', function () {
+    var counts = data[select.value] || {};
+    document.querySelectorAll('.season-count').forEach(function (el) {
+      var season = el.getAttribute('data-season');
+      var n = counts[season] || 0;
+      el.textContent = '(' + n + (n === 1 ? ' jugador)' : ' jugadores)');
+    });
+  });
+})();
+</script>
+{% endblock %}

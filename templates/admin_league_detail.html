@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Admin · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <a href="{{ url_for('admin_leagues') }}" class="muted">&larr; Todas las ligas</a>
+    <h1>🛠️ {{ league.name }}</h1>
+    <p class="muted">Código {{ league.invite_code }} · Jornada {{ league.current_gameweek }} · {{ members|length }}/{{ league.max_members }} entrenadores</p>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Máximo de entrenadores</h3>
+  <form method="post" action="{{ url_for('admin_set_max_members', league_id=league.id) }}" style="display:flex; gap:8px; align-items:flex-end;">
+    <div>
+      <label>Máximo actual: {{ league.max_members }}</label>
+      <input type="number" name="max_members" value="{{ league.max_members }}" min="{{ members|length }}" max="100">
+    </div>
+    <button class="btn btn-primary" type="submit">Actualizar</button>
+  </form>
+</div>
+
+<div class="card">
+  <table class="simple-table">
+    <thead>
+      <tr>
+        <th>Equipo</th>
+        <th>Entrenador</th>
+        <th>Plantilla</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td>{{ m.team_name }}</td>
+        <td>{{ m.username }}</td>
+        <td>{{ m.squad_size }} jugadores</td>
+        <td><a href="{{ url_for('admin_member_roster', league_id=league.id, user_id=m.user_id) }}" class="btn btn-secondary">Gestionar equipo</a></td>
+      </tr>
+      {% endfor %}
+      {% if not members %}
+      <tr><td colspan="4" class="empty-state">Esta liga todavía no tiene entrenadores.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

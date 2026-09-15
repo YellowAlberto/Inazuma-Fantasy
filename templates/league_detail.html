@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ league.name }} · Inazuma Fantasy{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>{{ league.name }}</h1>
+    <p class="muted">Código de invitación: <strong>{{ league.invite_code }}</strong> · Presupuesto {{ league.budget|euros }} · Jornada {{ league.current_gameweek }}</p>
+    <p class="muted">Temporadas: {{ seasons_label }}</p>
+    <p class="muted">Scouts: {{ {"all": "Todos los personajes", "exclude": "Sin scouts", "only": "Solo scouts"}.get(league.scout_filter, "Todos los personajes") }}</p>
+    {% if league.ended %}
+    <p class="muted" style="color: var(--orange);">🏆 Liga finalizada · Campeón: <strong>{{ champion.team_name if champion else '—' }}</strong></p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="tab-links">
+  <a href="{{ url_for('market', league_id=league.id) }}" class="btn btn-primary">🛒 Mercado de fichajes</a>
+  <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">📋 Mi equipo ({{ squad_count }} en plantilla)</a>
+  <a href="{{ url_for('standings', league_id=league.id) }}" class="btn btn-secondary">🏆 Clasificación</a>
+  <a href="{{ url_for('leaderboards', league_id=league.id) }}" class="btn btn-secondary">📊 Clasificaciones individuales</a>
+  <a href="{{ url_for('gameweeks', league_id=league.id) }}" class="btn btn-secondary">📅 Jornadas</a>
+</div>
+
+<h2 class="section-title">Entrenadores en esta liga ({{ members|length }}/{{ league.max_members }})</h2>
+<div class="card">
+  <table class="simple-table">
+    <thead><tr><th>Usuario</th><th>Equipo</th></tr></thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td>{{ m.username }}</td>
+        <td><a href="{{ url_for('view_member_team', league_id=league.id, user_id=m.user_id) }}">{{ m.team_name }}</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if is_creator %}
+<h2 class="section-title">Zona de peligro</h2>
+<form class="card form-card danger-zone" method="post" action="{{ url_for('delete_league', league_id=league.id) }}"
+      onsubmit="return confirm('¿Seguro que quieres eliminar esta liga? Se borrarán TODOS sus equipos, pujas y jornadas jugadas. Esta acción no se puede deshacer.');">
+  <h3>Eliminar esta liga</h3>
+  <p class="muted">Esto borra la liga entera para todos sus entrenadores: plantillas, pujas, mercado, jornadas jugadas y clasificación. No se puede deshacer.</p>
+  <label>Escribe el nombre exacto de la liga (<strong>{{ league.name }}</strong>) para confirmar</label>
+  <input type="text" name="confirm_name" placeholder="{{ league.name }}" required>
+  <button class="btn btn-danger" type="submit">🗑️ Eliminar liga definitivamente</button>
+</form>
+{% endif %}
+{% endblock %}
