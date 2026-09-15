@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Mi perfil · Inazuma Fantasy{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Mi perfil</h1>
+    <p class="muted">{{ user.username }}</p>
+  </div>
+</div>
+
+<div class="card" style="display:flex; gap:20px; align-items:center;">
+  {% if user.avatar_sprite_url %}
+    <img src="{{ user.avatar_sprite_url }}" alt="Tu icono" class="profile-avatar-big">
+  {% else %}
+    <div class="profile-avatar-big profile-avatar-placeholder">👤</div>
+  {% endif %}
+  <div>
+    <p class="muted" style="margin:0 0 10px;">Este es tu icono actual, visible junto a tu nombre en el menú y en la clasificación general.</p>
+    {% if user.avatar_sprite_url %}
+    <form method="post" action="{{ url_for('clear_avatar') }}">
+      <button class="btn btn-secondary" type="submit">Quitar icono</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="section-title">Elegir un icono nuevo</h2>
+<div class="card">
+  <form method="get" action="{{ url_for('profile') }}" style="display:flex; gap:8px; align-items:flex-end;">
+    <div style="flex-grow:1;">
+      <label>Buscar un personaje por nombre</label>
+      <input type="text" name="q" value="{{ query }}" placeholder="Ej. Mark Evans" autofocus>
+    </div>
+    <button class="btn btn-primary" type="submit">Buscar</button>
+  </form>
+
+  {% if query %}
+    {% if search_results %}
+    <div class="player-grid" style="margin-top:16px;">
+      {% for p in search_results %}
+      <div class="player-card">
+        <div class="player-card-top">
+          <span class="player-position-badge">{{ p.posicion }}</span>
+        </div>
+        <div class="player-sprite-wrap">
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+        </div>
+        <div class="player-card-body">
+          <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+          <div class="player-meta">{{ position_labels[p.posicion] }}</div>
+          <form method="post" action="{{ url_for('set_avatar') }}">
+            <input type="hidden" name="player_id" value="{{ p.id }}">
+            <input type="hidden" name="q" value="{{ query }}">
+            <button class="btn btn-primary btn-block" type="submit">Usar este icono</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty-state" style="margin-top:16px;">Sin resultados para "{{ query }}".</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

@@ -54,7 +54,25 @@ a:hover { text-decoration: underline; }
   text-decoration: none !important;
 }
 .navbar-links { display: flex; align-items: center; gap: 18px; }
-.navbar-user { color: var(--text-muted); font-size: 0.9rem; }
+.navbar-user { color: var(--text-muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.navbar-user:hover { color: var(--text-main); }
+.navbar-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); }
+.standings-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); vertical-align: middle; margin-right: 4px; }
+.profile-avatar-big {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid var(--orange);
+  flex-shrink: 0;
+}
+.profile-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  background: var(--navy-700);
+}
 
 .page-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 32px 80px; }
 

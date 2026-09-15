@@ -8,7 +8,7 @@
     <p class="muted">Temporadas: {{ seasons_label }}</p>
     <p class="muted">Scouts: {{ {"all": "Todos los personajes", "exclude": "Sin scouts", "only": "Solo scouts"}.get(league.scout_filter, "Todos los personajes") }}</p>
     {% if league.ended %}
-    <p class="muted" style="color: var(--orange);">🏆 Liga finalizada · Campeón: <strong>{{ champion.team_name if champion else '—' }}</strong></p>
+    <p class="muted" style="color: var(--orange);">🏆 Liga finalizada · Campeón: {% if champion and champion.avatar_sprite_url %}<img src="{{ champion.avatar_sprite_url }}" alt="" class="standings-avatar">{% endif %} <strong>{{ champion.team_name if champion else '—' }}</strong></p>
     {% endif %}
   </div>
 </div>

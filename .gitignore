@@ -11,5 +11,8 @@ venv/
 # Los sprites pesan ~57MB y no cambian casi nunca — súbelos a PythonAnywhere
 # una sola vez por separado (como ya hiciste) en vez de meterlos en git.
 static/sprites/
-static/sprites.zip
-static/sounds.zip
+
+# Zips sueltos que a veces quedan en la carpeta del proyecto al subir cosas
+# por partes (sprites, sonidos...). GitHub rechaza cualquier archivo de más
+# de 100MB, así que mejor que ni lo intente.
+*.zip

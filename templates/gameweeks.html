@@ -14,7 +14,7 @@
 {% if league.ended %}
 <div class="card" style="border-color: var(--orange);">
   <h3>🏆 Liga finalizada</h3>
-  <p>Campeón: <strong>{{ champion.team_name if champion else '—' }}</strong>{% if champion %} ({{ champion.total_points }} puntos){% endif %}</p>
+  <p>Campeón: {% if champion and champion.avatar_sprite_url %}<img src="{{ champion.avatar_sprite_url }}" alt="" class="standings-avatar">{% endif %} <strong>{{ champion.team_name if champion else '—' }}</strong>{% if champion %} ({{ champion.total_points }} puntos){% endif %}</p>
 </div>
 {% endif %}
 

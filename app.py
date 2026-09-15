@@ -188,7 +188,19 @@ def admin_required(view):
 @app.context_processor
 def inject_user():
     is_admin = bool(ADMIN_USERNAME) and session.get("username", "").lower() == ADMIN_USERNAME.lower()
-    return {"current_user": {"id": session.get("user_id"), "username": session.get("username"), "is_admin": is_admin}}
+    avatar_url = None
+    if session.get("user_id"):
+        db = get_db()
+        row = db.execute("SELECT avatar_sprite_url FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+        avatar_url = row["avatar_sprite_url"] if row else None
+    return {
+        "current_user": {
+            "id": session.get("user_id"),
+            "username": session.get("username"),
+            "is_admin": is_admin,
+            "avatar_url": avatar_url,
+        }
+    }
 
 
 def get_league_or_404(league_id):
@@ -778,6 +790,57 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/profile")
+@login_required
+def profile():
+    db = get_db()
+    user = row_to_dict(db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone())
+
+    query = request.args.get("q", "").strip()
+    search_results = []
+    if query:
+        search_results = rows_to_list(
+            db.execute(
+                "SELECT id, nombre, posicion, sprite_url FROM players WHERE nombre LIKE ? AND sprite_url IS NOT NULL ORDER BY nombre LIMIT 30",
+                (f"%{query}%",),
+            ).fetchall()
+        )
+
+    return render_template("profile.html", user=user, query=query, search_results=search_results, position_labels=POSITION_LABELS)
+
+
+@app.route("/profile/set-avatar", methods=["POST"])
+@login_required
+def set_avatar():
+    db = get_db()
+    player_id = request.form.get("player_id", type=int)
+    query = request.form.get("q", "")
+
+    if not player_id:
+        flash("Selecciona un jugador válido.", "error")
+        return redirect(url_for("profile", q=query))
+
+    player = db.execute("SELECT nombre, sprite_url FROM players WHERE id = ?", (player_id,)).fetchone()
+    if not player or not player["sprite_url"]:
+        flash("Ese jugador no tiene sprite disponible.", "error")
+        return redirect(url_for("profile", q=query))
+
+    db.execute("UPDATE users SET avatar_sprite_url = ? WHERE id = ?", (player["sprite_url"], session["user_id"]))
+    db.commit()
+    flash(f"¡Tu icono ahora es {player['nombre']}!", "success")
+    return redirect(url_for("profile"))
+
+
+@app.route("/profile/clear-avatar", methods=["POST"])
+@login_required
+def clear_avatar():
+    db = get_db()
+    db.execute("UPDATE users SET avatar_sprite_url = NULL WHERE id = ?", (session["user_id"],))
+    db.commit()
+    flash("Icono restablecido al de por defecto.", "success")
+    return redirect(url_for("profile"))
 
 
 # ---------------------------------------------------------------------------
@@ -1847,7 +1910,7 @@ def compute_standings(db, league_id):
     rows = rows_to_list(
         db.execute(
             """
-            SELECT lm.user_id, lm.team_name, u.username,
+            SELECT lm.user_id, lm.team_name, u.username, u.avatar_sprite_url,
                 COALESCE(SUM(gt.total_points), 0) as total_points
             FROM league_members lm
             JOIN users u ON u.id = lm.user_id

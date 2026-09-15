@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    avatar_sprite_url TEXT,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -197,6 +198,10 @@ def _run_migrations(conn):
     """Lightweight, idempotent migrations so existing local databases (from
     earlier versions of this app) get upgraded automatically instead of
     needing to be deleted and re-seeded."""
+    user_cols = [row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "avatar_sprite_url" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN avatar_sprite_url TEXT")
+
     league_cols = [row["name"] for row in conn.execute("PRAGMA table_info(leagues)").fetchall()]
     if "seasons" not in league_cols:
         conn.execute("ALTER TABLE leagues ADD COLUMN seasons TEXT NOT NULL DEFAULT ''")

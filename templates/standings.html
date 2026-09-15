@@ -18,7 +18,12 @@
       <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
         <td>{{ loop.index }}</td>
         <td><a href="{{ url_for('view_member_team', league_id=league.id, user_id=s.user_id) }}">{{ s.team_name }}</a></td>
-        <td>{{ s.username }}</td>
+        <td>
+          {% if s.avatar_sprite_url %}
+            <img src="{{ s.avatar_sprite_url }}" alt="" class="standings-avatar">
+          {% endif %}
+          {{ s.username }}
+        </td>
         <td><strong>{{ s.total_points }}</strong></td>
       </tr>
       {% endfor %}
