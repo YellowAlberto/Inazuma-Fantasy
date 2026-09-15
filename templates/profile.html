@@ -31,11 +31,10 @@
 <div class="modal-overlay" id="avatar-picker-modal">
   <div class="modal-box" style="max-width:800px;">
     <h2>Elegir un icono nuevo</h2>
-    <form method="get" action="{{ url_for('profile') }}" class="avatar-picker-filters">
-      <input type="hidden" name="picker" value="1">
+    <div class="avatar-picker-filters">
       <div>
         <label>Temporada</label>
-        <select name="season">
+        <select id="avatar-season-select">
           <option value="">Todas</option>
           {% for s in all_seasons %}
           <option value="{{ s }}" {{ 'selected' if s == season else '' }}>{{ season_labels_es.get(s, s) }}</option>
@@ -44,49 +43,102 @@
       </div>
       <div style="flex-grow:1;">
         <label>Buscar por nombre</label>
-        <input type="text" name="q" value="{{ query }}" placeholder="Ej. Mark Evans">
+        <input type="text" id="avatar-query-input" value="{{ query }}" placeholder="Ej. Mark Evans" autocomplete="off">
       </div>
-      <button class="btn btn-primary" type="submit">Buscar</button>
-    </form>
-
-    {% if not query and not season %}
-    <p class="empty-state" style="margin-top:16px;">Elige una temporada o busca un nombre para ver personajes (hay más de 5000, así que no se muestran todos de golpe).</p>
-    {% elif search_results %}
-    <p class="muted" style="margin-top:12px;">
-      {% if result_count > result_limit %}
-        Mostrando {{ result_limit }} de {{ result_count }} resultados — afina la búsqueda para ver más concretos.
-      {% else %}
-        {{ result_count }} resultado{{ 's' if result_count != 1 else '' }}
-      {% endif %}
-    </p>
-    <div class="player-grid" style="margin-top:8px;">
-      {% for p in search_results %}
-      <div class="player-card">
-        <div class="player-card-top">
-          <span class="player-position-badge">{{ p.posicion }}</span>
-        </div>
-        <div class="player-sprite-wrap">
-          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
-        </div>
-        <div class="player-card-body">
-          <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-          <div class="player-meta">{{ position_labels[p.posicion] }}</div>
-          <form method="post" action="{{ url_for('set_avatar') }}">
-            <input type="hidden" name="player_id" value="{{ p.id }}">
-            <input type="hidden" name="q" value="{{ query }}">
-            <input type="hidden" name="season" value="{{ season }}">
-            <button class="btn btn-primary btn-block" type="submit">Usar este icono</button>
-          </form>
-        </div>
-      </div>
-      {% endfor %}
     </div>
-    {% else %}
-    <p class="empty-state" style="margin-top:16px;">Sin resultados para esa búsqueda.</p>
-    {% endif %}
+
+    <div id="avatar-picker-status" class="muted" style="margin-top:12px;"></div>
+    <div id="avatar-picker-results" class="player-grid" style="margin-top:8px;"></div>
 
     <a href="{{ url_for('profile') }}" class="btn btn-ghost btn-block" style="margin-top:16px;">Cerrar</a>
   </div>
 </div>
+
+<script>
+(function () {
+  var seasonSelect = document.getElementById('avatar-season-select');
+  var queryInput = document.getElementById('avatar-query-input');
+  var statusEl = document.getElementById('avatar-picker-status');
+  var resultsEl = document.getElementById('avatar-picker-results');
+  var searchUrl = "{{ url_for('avatar_search') }}";
+  var setAvatarUrl = "{{ url_for('set_avatar') }}";
+  var debounceTimer = null;
+  var currentRequest = null;
+
+  function renderResults(data) {
+    resultsEl.innerHTML = '';
+    if (!data.results.length) {
+      statusEl.textContent = (queryInput.value || seasonSelect.value)
+        ? 'Sin resultados para esa búsqueda.'
+        : 'Elige una temporada o escribe un nombre para ver personajes (hay más de 5000, así que no se muestran todos de golpe).';
+      return;
+    }
+    statusEl.textContent = data.count > data.limit
+      ? 'Mostrando ' + data.limit + ' de ' + data.count + ' resultados — afina la búsqueda para ver más concretos.'
+      : data.count + ' resultado' + (data.count !== 1 ? 's' : '');
+
+    data.results.forEach(function (p) {
+      var card = document.createElement('div');
+      card.className = 'player-card';
+      card.innerHTML =
+        '<div class="player-card-top"><span class="player-position-badge"></span></div>' +
+        '<div class="player-sprite-wrap"><img class="player-sprite" loading="lazy"></div>' +
+        '<div class="player-card-body">' +
+          '<div class="player-name"></div>' +
+          '<div class="player-meta"></div>' +
+          '<button class="btn btn-primary btn-block" type="button">Usar este icono</button>' +
+        '</div>';
+      card.querySelector('.player-position-badge').textContent = p.posicion;
+      var img = card.querySelector('.player-sprite');
+      img.src = p.sprite_url;
+      img.alt = p.nombre;
+      card.querySelector('.player-name').textContent = p.nombre;
+      card.querySelector('.player-name').title = p.nombre;
+      card.querySelector('.player-meta').textContent = p.posicion_label;
+      card.querySelector('button').addEventListener('click', function () {
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = setAvatarUrl;
+        var fields = {player_id: p.id, q: queryInput.value, season: seasonSelect.value};
+        Object.keys(fields).forEach(function (key) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = fields[key];
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      });
+      resultsEl.appendChild(card);
+    });
+  }
+
+  function runSearch() {
+    var q = queryInput.value.trim();
+    var season = seasonSelect.value;
+    if (!q && !season) {
+      renderResults({count: 0, limit: 0, results: []});
+      return;
+    }
+    if (currentRequest) currentRequest.abort();
+    var controller = new AbortController();
+    currentRequest = controller;
+    statusEl.textContent = 'Buscando...';
+    fetch(searchUrl + '?q=' + encodeURIComponent(q) + '&season=' + encodeURIComponent(season), {signal: controller.signal})
+      .then(function (r) { return r.json(); })
+      .then(function (data) { renderResults(data); })
+      .catch(function (err) { if (err.name !== 'AbortError') statusEl.textContent = 'Error al buscar.'; });
+  }
+
+  queryInput.addEventListener('input', function () {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runSearch, 250);
+  });
+  seasonSelect.addEventListener('change', runSearch);
+
+  runSearch();
+})();
+</script>
 {% endif %}
 {% endblock %}

@@ -60,6 +60,31 @@ CPU_BID_CHANCE = 0.65
 MARKET_SIM_USER_ID = -2
 MAX_LEAGUE_MEMBERS = 10
 MAX_LEAGUE_CYCLES = 3  # a league runs for 3 full round-robin cycles (everyone plays everyone 3 times) before it ends and crowns a champion
+AVATAR_RESULT_LIMIT = 60
+
+
+def _search_avatar_candidates(db, season, query, limit):
+    """Shared filter logic for the avatar picker: used by both the normal
+    page load and the live-search JSON endpoint. Returns (total_count, rows)."""
+    where = ["sprite_url IS NOT NULL"]
+    params = []
+    if season and season in SEASON_GROUPS:
+        juegos = SEASON_GROUPS[season]
+        where.append(f"juego IN ({','.join('?' for _ in juegos)})")
+        params.extend(juegos)
+    if query:
+        where.append("nombre LIKE ?")
+        params.append(f"%{query}%")
+    where_sql = " AND ".join(where)
+
+    count = db.execute(f"SELECT COUNT(*) as c FROM players WHERE {where_sql}", params).fetchone()["c"]
+    rows = rows_to_list(
+        db.execute(
+            f"SELECT id, nombre, posicion, sprite_url, juego FROM players WHERE {where_sql} ORDER BY nombre LIMIT ?",
+            params + [limit],
+        ).fetchall()
+    )
+    return count, rows
 POINTS_PER_MILLION_EUROS = 10  # 1 point = 100.000€, so 10 points = 1.000.000€
 
 
@@ -804,26 +829,8 @@ def profile():
 
     search_results = []
     result_count = 0
-    AVATAR_RESULT_LIMIT = 60
     if picker_open and (query or season):
-        where = ["sprite_url IS NOT NULL"]
-        params = []
-        if season and season in SEASON_GROUPS:
-            juegos = SEASON_GROUPS[season]
-            where.append(f"juego IN ({','.join('?' for _ in juegos)})")
-            params.extend(juegos)
-        if query:
-            where.append("nombre LIKE ?")
-            params.append(f"%{query}%")
-        where_sql = " AND ".join(where)
-
-        result_count = db.execute(f"SELECT COUNT(*) as c FROM players WHERE {where_sql}", params).fetchone()["c"]
-        search_results = rows_to_list(
-            db.execute(
-                f"SELECT id, nombre, posicion, sprite_url, juego FROM players WHERE {where_sql} ORDER BY nombre LIMIT ?",
-                params + [AVATAR_RESULT_LIMIT],
-            ).fetchall()
-        )
+        result_count, search_results = _search_avatar_candidates(db, season, query, AVATAR_RESULT_LIMIT)
 
     return render_template(
         "profile.html",
@@ -838,6 +845,34 @@ def profile():
         season_labels_es={s: season_label_es(s) for s in SEASON_GROUPS},
         position_labels=POSITION_LABELS,
     )
+
+
+@app.route("/profile/avatar-search")
+@login_required
+def avatar_search():
+    """JSON endpoint powering the live (as-you-type) avatar search box."""
+    db = get_db()
+    query = request.args.get("q", "").strip()
+    season = request.args.get("season", "")
+
+    if not query and not season:
+        return {"count": 0, "results": []}
+
+    count, results = _search_avatar_candidates(db, season, query, AVATAR_RESULT_LIMIT)
+    return {
+        "count": count,
+        "limit": AVATAR_RESULT_LIMIT,
+        "results": [
+            {
+                "id": p["id"],
+                "nombre": p["nombre"],
+                "posicion": p["posicion"],
+                "posicion_label": POSITION_LABELS.get(p["posicion"], p["posicion"]),
+                "sprite_url": p["sprite_url"],
+            }
+            for p in results
+        ],
+    }
 
 
 @app.route("/profile/set-avatar", methods=["POST"])
