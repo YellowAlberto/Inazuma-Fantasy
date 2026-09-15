@@ -156,16 +156,11 @@ def element_duel_bonus(attacker_element, defender_element):
 # ---------------------------------------------------------------------------
 # Super técnicas — a rare, flashy move (Inazuma Eleven style) that GUARANTEES
 # whatever the player is attempting: a save, a block, a dribble past a
-# defender, or a goal. We don't have real named techniques per character in
-# the data, so we generate a plausible one from their element instead.
+# defender, or a goal. Only real, correctly-categorized hissatsu técnicas
+# from the game are ever used — no invented/generic names. A player with no
+# real técnica on file for a given category simply never triggers one there.
 # ---------------------------------------------------------------------------
 SUPER_TECHNIQUE_CHANCE = 0.05
-ELEMENT_TECHNIQUE_NAMES = {
-    "Fire": ["Tornado de Fuego", "Puño Solar", "Explosión Carmesí", "Meteoro Ardiente"],
-    "Forest": ["Guardián del Bosque", "Raíces de Hierro", "Velo Verde", "Zarpazo Salvaje"],
-    "Wind": ["Ráfaga Cortante", "Paso Fantasma", "Torbellino Gemelo", "Corte de Viento"],
-    "Mountain": ["Puño de Montaña", "Muralla de Piedra", "Sacudida Sísmica", "Avalancha"],
-}
 
 
 def roll_super_technique(player, category):
@@ -173,27 +168,22 @@ def roll_super_technique(player, category):
     action. `category` must be one of 'tiro', 'porteria', 'defensa', 'regate'
     — only a técnica actually classified under that category (e.g. never a
     dribble move for a shot) will ever be picked. Returns the technique's
-    name, or None. Uses the player's real, correctly-categorized hissatsu
-    técnicas when we have them on file; falls back to a plausible
-    element-flavored name (generic, not category-specific) otherwise."""
+    real name, or None if this player has no real técnica on file for that
+    category (no invented/generic names are ever used as a stand-in)."""
     if not player or random.random() >= SUPER_TECHNIQUE_CHANCE:
         return None
 
     raw = player.get("tecnicas_por_tipo")
-    if raw:
-        try:
-            by_type = raw if isinstance(raw, dict) else json.loads(raw)
-        except (ValueError, TypeError):
-            by_type = None
-        if by_type:
-            real_names = by_type.get(category)
-            if real_names:
-                return random.choice(real_names)
-
-    names = ELEMENT_TECHNIQUE_NAMES.get(player.get("elemento"))
-    if not names:
+    if not raw:
         return None
-    return random.choice(names)
+    try:
+        by_type = raw if isinstance(raw, dict) else json.loads(raw)
+    except (ValueError, TypeError):
+        return None
+    real_names = by_type.get(category) if by_type else None
+    if not real_names:
+        return None
+    return random.choice(real_names)
 
 
 def _normalize_stat(value):
@@ -321,12 +311,25 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
         attackers = side["outfield"] or side["lineup"]
         if not attackers:
             continue
-        attacker = _pick_weighted(
-            attackers,
-            lambda p: _normalize_stat(p["potencia"]) + _normalize_stat(p["tecnica"]) + _normalize_stat(p["control"]),
-        )
 
         roll = random.random()
+
+        if roll >= 0.82:
+            # Shot attempt: realistically forwards take the large majority
+            # of shots, midfielders a fair share, and defenders only rarely
+            # (set pieces, a rare forward burst) — not just whoever happens
+            # to have the best stats today, regardless of position.
+            def _shot_weight(p):
+                base = _normalize_stat(p["potencia"]) + _normalize_stat(p["tecnica"]) + _normalize_stat(p["control"])
+                position_factor = {"FW": 1.6, "MF": 0.75, "DF": 0.18}.get(p["posicion"], 1.0)
+                return base * position_factor
+
+            attacker = _pick_weighted(attackers, _shot_weight)
+        else:
+            attacker = _pick_weighted(
+                attackers,
+                lambda p: _normalize_stat(p["potencia"]) + _normalize_stat(p["tecnica"]) + _normalize_stat(p["control"]),
+            )
 
         if roll < 0.28:
             # Buildup pass: no points by itself, but sets up a possible assist.

@@ -371,6 +371,20 @@ document.addEventListener('DOMContentLoaded', function () {
           moveBadgeTo(c, cx + (x - cx) * 0.3, cy + (y - cy) * 0.3);
           activeSupportBadges.push(c);
         });
+
+        // Everyone else on the pitch also leans a little toward the ball
+        // from their formation spot, so the whole team looks alive and
+        // reactive instead of frozen statues off in the corners. This is
+        // always computed fresh from each player's home spot (not added
+        // on top of wherever they already are), so it can never drift
+        // them permanently out of position over the course of a match.
+        var DRIFT_TOWARD_BALL = 0.16;
+        badges.forEach(function (b) {
+          if (b === activeBadge || activeSupportBadges.indexOf(b) !== -1) return;
+          var hx = parseFloat(b.dataset.x);
+          var hy = parseFloat(b.dataset.y);
+          moveBadgeTo(b, hx + (x - hx) * DRIFT_TOWARD_BALL, hy + (y - hy) * DRIFT_TOWARD_BALL);
+        });
       } else {
         activeBadge = null;
       }
