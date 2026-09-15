@@ -218,14 +218,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // their own box regardless, never dragged out by this blend.
   function actionX(ev, badge) {
     var ideal = idealActionX(ev);
-    if (ev.type === 'save' || !badge) return ideal;
+    if (ev.type === 'save' || !badge || badge.dataset.position === 'GK') return ideal;
     var homeX = parseFloat(badge.dataset.x);
     return clampPct(homeX + (ideal - homeX) * 0.55);
   }
 
   function actionY(ev, badge) {
     var ideal = idealActionY(ev);
-    if (ev.type === 'save' || !badge) return ideal;
+    if (ev.type === 'save' || !badge || badge.dataset.position === 'GK') return ideal;
     var homeY = parseFloat(badge.dataset.y);
     return clampPct(homeY + (ideal - homeY) * 0.55);
   }
@@ -382,9 +382,11 @@ document.addEventListener('DOMContentLoaded', function () {
         var idealX = actionX(ev, badge);
         var idealY = actionY(ev, badge);
         var x, y;
-        if (ev.type === 'save') {
+        var isGoalkeeperAction = badge.dataset.position === 'GK';
+        if (ev.type === 'save' || isGoalkeeperAction) {
           // The goalkeeper is always right there in their own box — never
-          // dragged toward wherever the ball happened to be a moment ago.
+          // dragged toward wherever the ball happened to be a moment ago,
+          // whatever they're doing (a save, a clearance, anything).
           x = idealX;
           y = idealY;
         } else {
