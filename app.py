@@ -1893,7 +1893,7 @@ def leaderboards(league_id):
             db.execute(
                 f"""
                 SELECT gs.player_id, p.nombre, p.posicion, p.sprite_url, SUM(gs.{column}) as total,
-                    lm.team_name AS owner_team_name
+                    lm.team_name AS owner_team_name, r.user_id AS owner_user_id
                 FROM gameweek_scores gs
                 JOIN players p ON p.id = gs.player_id
                 LEFT JOIN rosters r ON r.league_id = gs.league_id AND r.player_id = gs.player_id
@@ -1909,7 +1909,13 @@ def leaderboards(league_id):
         )
         categories.append({"label": label, "column": column, "rows": rows})
 
-    return render_template("leaderboards.html", league=league, categories=categories, position_labels=POSITION_LABELS)
+    return render_template(
+        "leaderboards.html",
+        league=league,
+        categories=categories,
+        position_labels=POSITION_LABELS,
+        my_user_id=session["user_id"],
+    )
 
 
 @app.route("/leagues/<int:league_id>/gameweeks")

@@ -19,43 +19,48 @@
   {% endfor %}
 </div>
 
-<h2 class="section-title">{{ 'Crear otra liga o unirte con un código' if leagues else 'Crear o unirte a una liga' }}</h2>
-<div class="two-col">
-  <form class="card form-card" method="post" action="{{ url_for('create_league') }}">
-    <h3>Crear una liga</h3>
-    <label>Nombre de la liga</label>
-    <input name="name" placeholder="Liga Raimon" required>
-    <label>Nombre de tu equipo</label>
-    <input name="team_name" placeholder="Los Invencibles" required>
-    <label>Presupuesto (millones de €)</label>
-    <input type="number" name="budget" value="80" min="10" max="500" step="1">
-    <label>Temporadas incluidas (ninguna marcada = todas)</label>
-    <div class="checkbox-list">
-      {% for s in all_seasons %}
-      <label class="checkbox-item">
-        <input type="checkbox" name="seasons" value="{{ s }}">
-        {{ season_labels_es.get(s, s) }} <span class="season-count" data-season="{{ s }}">({{ season_counts.get(s, 0) }} jugadores)</span>
-      </label>
-      {% endfor %}
-    </div>
-    <label>Personajes scout (sin equipo conocido)</label>
-    <select name="scout_filter" id="scout-filter-select">
-      <option value="all">Todos los personajes</option>
-      <option value="exclude">Sin scouts ({{ non_scout_count }} jugadores)</option>
-      <option value="only">Solo scouts ({{ scout_count }} jugadores)</option>
-    </select>
-    <button class="btn btn-primary" type="submit">Crear liga</button>
-    <p class="muted">Al crear la liga se te asignará automáticamente un equipo inicial equilibrado.</p>
-  </form>
+<button class="btn btn-secondary" id="toggle-create-join" type="button" style="margin-top:20px;">
+  ➕ Crear otra liga o unirme con un código
+</button>
 
-  <form class="card form-card" method="post" action="{{ url_for('join_league') }}">
-    <h3>Unirme con un código</h3>
-    <label>Código de invitación</label>
-    <input name="invite_code" placeholder="ABC123" required style="text-transform:uppercase">
-    <label>Nombre de tu equipo</label>
-    <input name="team_name" placeholder="Tu equipo" required>
-    <button class="btn btn-secondary" type="submit">Unirme</button>
-  </form>
+<div id="create-join-section" style="display:{{ 'block' if not leagues else 'none' }}; margin-top:20px;">
+  <div class="two-col">
+    <form class="card form-card" method="post" action="{{ url_for('create_league') }}">
+      <h3>Crear una liga</h3>
+      <label>Nombre de la liga</label>
+      <input name="name" placeholder="Liga Raimon" required>
+      <label>Nombre de tu equipo</label>
+      <input name="team_name" placeholder="Los Invencibles" required>
+      <label>Presupuesto (millones de €)</label>
+      <input type="number" name="budget" value="80" min="10" max="500" step="1">
+      <label>Temporadas incluidas (ninguna marcada = todas)</label>
+      <div class="checkbox-list">
+        {% for s in all_seasons %}
+        <label class="checkbox-item">
+          <input type="checkbox" name="seasons" value="{{ s }}">
+          {{ season_labels_es.get(s, s) }} <span class="season-count" data-season="{{ s }}">({{ season_counts.get(s, 0) }} jugadores)</span>
+        </label>
+        {% endfor %}
+      </div>
+      <label>Personajes scout (sin equipo conocido)</label>
+      <select name="scout_filter" id="scout-filter-select">
+        <option value="all">Todos los personajes</option>
+        <option value="exclude">Sin scouts ({{ non_scout_count }} jugadores)</option>
+        <option value="only">Solo scouts ({{ scout_count }} jugadores)</option>
+      </select>
+      <button class="btn btn-primary" type="submit">Crear liga</button>
+      <p class="muted">Al crear la liga se te asignará automáticamente un equipo inicial equilibrado.</p>
+    </form>
+
+    <form class="card form-card" method="post" action="{{ url_for('join_league') }}">
+      <h3>Unirme con un código</h3>
+      <label>Código de invitación</label>
+      <input name="invite_code" placeholder="ABC123" required style="text-transform:uppercase">
+      <label>Nombre de tu equipo</label>
+      <input name="team_name" placeholder="Tu equipo" required>
+      <button class="btn btn-secondary" type="submit">Unirme</button>
+    </form>
+  </div>
 </div>
 
 <script type="application/json" id="season-counts-by-scout-filter">{{ season_counts_by_scout_filter | tojson }}</script>
@@ -63,14 +68,23 @@
 (function () {
   var data = JSON.parse(document.getElementById('season-counts-by-scout-filter').textContent);
   var select = document.getElementById('scout-filter-select');
-  if (!select) return;
-  select.addEventListener('change', function () {
-    var counts = data[select.value] || {};
-    document.querySelectorAll('.season-count').forEach(function (el) {
-      var season = el.getAttribute('data-season');
-      var n = counts[season] || 0;
-      el.textContent = '(' + n + (n === 1 ? ' jugador)' : ' jugadores)');
+  if (select) {
+    select.addEventListener('change', function () {
+      var counts = data[select.value] || {};
+      document.querySelectorAll('.season-count').forEach(function (el) {
+        var season = el.getAttribute('data-season');
+        var n = counts[season] || 0;
+        el.textContent = '(' + n + (n === 1 ? ' jugador)' : ' jugadores)');
+      });
     });
+  }
+
+  var toggleBtn = document.getElementById('toggle-create-join');
+  var section = document.getElementById('create-join-section');
+  toggleBtn.addEventListener('click', function () {
+    var isHidden = section.style.display === 'none';
+    section.style.display = isHidden ? 'block' : 'none';
+    toggleBtn.textContent = isHidden ? '➖ Ocultar' : '➕ Crear otra liga o unirme con un código';
   });
 })();
 </script>

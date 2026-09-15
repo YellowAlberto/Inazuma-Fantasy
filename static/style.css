@@ -347,6 +347,7 @@ a:hover { text-decoration: underline; }
 .leaderboard-avatar-placeholder { display: flex; align-items: center; justify-content: center; font-size: 1rem; }
 .leaderboard-total { text-align: right; font-weight: 700; color: var(--orange); white-space: nowrap; }
 .leaderboard-owner { font-size: 0.75rem; color: var(--text-muted); }
+.leaderboard-mine { color: var(--orange) !important; }
 
 .pitch-swap-popup {
   position: absolute;
