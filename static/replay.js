@@ -167,10 +167,9 @@ document.addEventListener('DOMContentLoaded', function () {
     return Math.min(95, Math.max(5, value));
   }
 
-  // Where the action happens horizontally (0% = home goal line, 100% =
-  // away goal line), based on what the event represents rather than a
-  // fixed formation slot — this is where the involved player steps to.
-  function actionX(ev) {
+  // Where the action "ideally" happens horizontally, based on what the
+  // event represents (0% = home goal line, 100% = away goal line).
+  function idealActionX(ev) {
     var jitter = Math.random() * 5 - 2.5;
     if (ev.type === 'goal' || ev.type === 'shot_off') {
       return clampPct((ev.side === 'home' ? 88 : 12) + jitter);
@@ -199,10 +198,36 @@ document.addEventListener('DOMContentLoaded', function () {
     return 50;
   }
 
-  function actionY(ev) {
+  function idealActionY(ev) {
+    // The goalkeeper never leaves their box to make a save — keep them
+    // tightly centered on their own goal line, not spread across the pitch.
+    if (ev.type === 'save') {
+      return clampPct(50 + (Math.random() * 16 - 8));
+    }
     var tight = ev.type === 'steal' || ev.type === 'interception' || ev.type === 'key_pass';
     var spread = tight ? 14 : 20;
     return clampPct(50 + (Math.random() * spread * 2 - spread));
+  }
+
+  // Blends the "ideal" zone for this event type with the player's own
+  // actual formation spot (badge.dataset.x/y) — so a right-back doesn't
+  // suddenly appear in the opposite box just because a shot happened;
+  // instead they're shown stepping forward from wherever they really
+  // play, toward the play, which reads as much more natural. The one
+  // exception is the goalkeeper on a save: they stay anchored tightly to
+  // their own box regardless, never dragged out by this blend.
+  function actionX(ev, badge) {
+    var ideal = idealActionX(ev);
+    if (ev.type === 'save' || !badge) return ideal;
+    var homeX = parseFloat(badge.dataset.x);
+    return clampPct(homeX + (ideal - homeX) * 0.55);
+  }
+
+  function actionY(ev, badge) {
+    var ideal = idealActionY(ev);
+    if (ev.type === 'save' || !badge) return ideal;
+    var homeY = parseFloat(badge.dataset.y);
+    return clampPct(homeY + (ideal - homeY) * 0.55);
   }
 
   document.querySelectorAll('.replay').forEach(function (container) {
@@ -247,6 +272,13 @@ document.addEventListener('DOMContentLoaded', function () {
     var awayGoals = 0;
     var activeBadge = null;
     var activeSupportBadges = [];
+    // Tracks where the ball actually is right now, so the next play's
+    // target position can be blended with it instead of teleporting
+    // straight to the "ideal" spot for that event type — many buildup
+    // passes never show up as their own event, so without this the ball
+    // can otherwise jump between unrelated parts of the pitch.
+    var lastBallX = 50;
+    var lastBallY = 50;
 
     function badgeFor(playerId) {
       if (playerId === undefined || playerId === null) return null;
@@ -327,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function () {
       homeGoals = 0;
       awayGoals = 0;
       resetAllBadges();
-      placeBall(50, 50);
+      placeBall(50, 50); lastBallX = 50; lastBallY = 50;
       clock.textContent = "Min 0'";
       updateScoreboard();
       hidePoints();
@@ -344,8 +376,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
       var badge = badgeFor(ev.player_id);
       if (badge) {
-        var x = actionX(ev);
-        var y = actionY(ev);
+        var idealX = actionX(ev, badge);
+        var idealY = actionY(ev, badge);
+        var x, y;
+        if (ev.type === 'save') {
+          // The goalkeeper is always right there in their own box — never
+          // dragged toward wherever the ball happened to be a moment ago.
+          x = idealX;
+          y = idealY;
+        } else {
+          // Blend toward the ideal spot for this event type instead of
+          // jumping straight there — keeps the ball's path feeling like one
+          // continuous, flowing move even across the many buildup passes
+          // that don't get their own visible event in between.
+          var BALL_CONTINUITY = 0.55;
+          x = clampPct(lastBallX + (idealX - lastBallX) * BALL_CONTINUITY);
+          y = clampPct(lastBallY + (idealY - lastBallY) * BALL_CONTINUITY);
+        }
+        lastBallX = x;
+        lastBallY = y;
         moveBadgeTo(badge, x, y);
         placeBall(x, y);
         badge.classList.remove('pitch-mini-player-glow', 'pitch-mini-player-glow-goal');
@@ -422,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function () {
         revealPoints();
         caption.textContent = 'Fin del partido: ' + homeLabel + ' ' + homeGoals + ' - ' + awayGoals + ' ' + awayLabel;
         resetAllBadges();
-        placeBall(50, 50);
+        placeBall(50, 50); lastBallX = 50; lastBallY = 50;
         return;
       }
 
@@ -435,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function () {
         // goal, just like a real restart, before the next play continues.
         timer = setTimeout(function () {
           resetAllBadges();
-          placeBall(50, 50);
+          placeBall(50, 50); lastBallX = 50; lastBallY = 50;
           timer = setTimeout(step, 700);
         }, 600);
       } else {

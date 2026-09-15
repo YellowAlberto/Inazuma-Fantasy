@@ -196,6 +196,79 @@ def _pick_weighted(players, weight_fn):
     return random.choices(players, weights=weights, k=1)[0]
 
 
+def _compute_lineup_y_positions(lineup):
+    """Assigns each player a rough lateral pitch position (0-100, same idea
+    as the y-coordinate used to lay them out on the visual pitch) based on
+    where they sit within their position line, spread evenly. This gives
+    the engine a notion of 'nearby' vs 'far away' so, for example, the
+    right-sided midfielder who has the ball tends to be closed down by a
+    nearby defender/midfielder rather than by whoever happens to be picked
+    at random anywhere on the pitch."""
+    by_pos = {}
+    for p in lineup:
+        by_pos.setdefault(p["posicion"], []).append(p)
+    y_by_id = {}
+    for players in by_pos.values():
+        n = len(players)
+        for i, p in enumerate(players):
+            y_by_id[p["id"]] = (i + 1) / (n + 1) * 100
+    return y_by_id
+
+
+def _proximity_weight(attacker_y, candidate_y):
+    """Multiplier applied on top of a defender's stats: close to the
+    attacker's lateral position -> boosted; far away -> reduced (but never
+    to zero — real defenses do sometimes shift/cover across the pitch)."""
+    if attacker_y is None or candidate_y is None:
+        return 1.0
+    distance = abs(attacker_y - candidate_y)
+    return max(0.3, 1.8 - 1.5 * (distance / 100))
+
+
+def _nearby_pool(candidates, ball_y, y_positions, max_distance=40):
+    """Restricts a pool of candidates to those actually near the ball's
+    current lateral position — a player standing on the far side of the
+    pitch simply isn't involved in this particular play. Falls back to the
+    full pool if nobody qualifies, so the simulation never gets stuck with
+    an empty choice."""
+    nearby = [p for p in candidates if abs(ball_y - y_positions.get(p["id"], 50)) <= max_distance]
+    return nearby or candidates
+
+
+class MarkingMemory:
+    """Experimental: a lightweight persistent 'state' for defenders. Once a
+    defender starts marking a specific attacker, they tend to keep marking
+    that same player for a stretch of actions — a simple state machine
+    (assigned / not-assigned, with a countdown) instead of every challenge
+    re-rolling from scratch with no memory of what just happened."""
+
+    STICKY_CHANCE = 0.7  # how often we honor the existing assignment vs re-rolling
+    DEFAULT_DURATION = 22  # actions an assignment survives before going stale (most of a match)
+
+    def __init__(self):
+        self._assignments = {}  # attacker_id -> [defender_id, actions_left]
+
+    def get_marker(self, attacker_id, eligible_ids):
+        entry = self._assignments.get(attacker_id)
+        if not entry:
+            return None
+        defender_id, _ = entry
+        if defender_id not in eligible_ids:
+            return None
+        if random.random() >= self.STICKY_CHANCE:
+            return None  # sometimes the marker gets dragged away regardless
+        return defender_id
+
+    def assign(self, attacker_id, defender_id, duration=None):
+        self._assignments[attacker_id] = [defender_id, duration or self.DEFAULT_DURATION]
+
+    def tick(self):
+        for attacker_id in list(self._assignments.keys()):
+            self._assignments[attacker_id][1] -= 1
+            if self._assignments[attacker_id][1] <= 0:
+                del self._assignments[attacker_id]
+
+
 def _team_possession_strength(lineup):
     outfield = [p for p in lineup if p["posicion"] != "GK"] or lineup
     if not outfield:
@@ -241,7 +314,7 @@ class _PlayerLog:
         self.blocks = 0
 
 
-def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
+def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marking_memory=False):
     """Simulates a full 90-minute match as ~50 discrete actions (passes,
     tackles, shots, saves, goals...) instead of rolling each player's
     gameweek independently. The scoreline, clean sheets and each player's
@@ -251,6 +324,11 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
     Returns a dict with home/away goals & fantasy points, a per-player
     {player_id: (points, breakdown_lines)} map for each side, and a
     "timeline" list of narrated highlight lines.
+
+    `use_marking_memory` (experimental, default off): when True, defenders
+    tend to keep marking the same attacker for a stretch of actions instead
+    of a fresh random pick every single challenge — a small persistent
+    state per player rather than no memory at all between actions.
     """
     sides = {
         "home": {
@@ -262,6 +340,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
             "last_passer": None,
             "shots": 0,
             "affinities": active_match_affinities(home_lineup),
+            "y_positions": _compute_lineup_y_positions(home_lineup),
+            "marking": MarkingMemory() if use_marking_memory else None,
         },
         "away": {
             "lineup": away_lineup,
@@ -272,6 +352,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
             "last_passer": None,
             "shots": 0,
             "affinities": active_match_affinities(away_lineup),
+            "y_positions": _compute_lineup_y_positions(away_lineup),
+            "marking": MarkingMemory() if use_marking_memory else None,
         },
     }
 
@@ -297,6 +379,11 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
         momentum = momentum + (target - momentum) * MOMENTUM_PUSH
 
     running_goals = {"home": 0, "away": 0}
+    # The ball's actual lateral position on the pitch (0-100), carried over
+    # between actions — only players actually near it can be involved in
+    # the next play, instead of picking anyone on the pitch at random
+    # regardless of where the action is really happening.
+    ball_y = 50.0
 
     timeline = []
     minutes = sorted(random.randint(1, 90) for _ in range(ACTIONS_PER_MATCH))
@@ -308,7 +395,15 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
         other_key = "away" if side_key == "home" else "home"
         side, other = sides[side_key], sides[other_key]
 
-        attackers = side["outfield"] or side["lineup"]
+        if use_marking_memory:
+            sides["home"]["marking"].tick()
+            sides["away"]["marking"].tick()
+
+        # Widened on purpose: this decides who's generally "involved" in
+        # advancing the play, which should stay fairly open (real football
+        # doesn't confine attackers to a narrow band), unlike defensive
+        # marking further down, which uses a much tighter radius.
+        attackers = _nearby_pool(side["outfield"] or side["lineup"], ball_y, side["y_positions"], max_distance=65)
         if not attackers:
             continue
 
@@ -331,8 +426,27 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                 lambda p: _normalize_stat(p["potencia"]) + _normalize_stat(p["tecnica"]) + _normalize_stat(p["control"]),
             )
 
+        # The ball is now with whoever we just picked as the protagonist of
+        # this action — the next action's participants get judged against
+        # this new spot, not the old one.
+        ball_y = side["y_positions"].get(attacker["id"], ball_y)
+
         if roll < 0.28:
-            # Buildup pass: no points by itself, but sets up a possible assist.
+            # Buildup pass: the ball carrier usually looks to pass it on —
+            # most often a short, safe ball to whoever's nearest, with a
+            # smaller chance of a longer diagonal ball / switch of play to
+            # someone farther away — but sometimes decides to carry it
+            # themselves (a dribble) instead of passing at all.
+            attacker_y_here = side["y_positions"].get(attacker["id"], 50)
+            teammates = [p for p in attackers if p["id"] != attacker["id"]]
+            if teammates and random.random() >= 0.25:
+                recipient = _pick_weighted(
+                    teammates,
+                    lambda p: _proximity_weight(attacker_y_here, side["y_positions"].get(p["id"])),
+                )
+                ball_y = side["y_positions"].get(recipient["id"], ball_y)
+            # else: keeps it themselves — the ball stays right where they are.
+
             side["last_passer"] = attacker
             # Afinidad: sharp team chemistry turns some routine passes into
             # genuine chances on their own.
@@ -366,12 +480,25 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
 
         elif roll < 0.60:
             # A defender/midfielder from the other side tries a tackle.
-            defenders_pool = [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"]
+            defenders_pool = _nearby_pool(
+                [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"],
+                ball_y,
+                other["y_positions"],
+            )
             if defenders_pool:
-                defender = _pick_weighted(
-                    defenders_pool,
-                    lambda p: _normalize_stat(p["fisico"]) + _normalize_stat(p["presion"]),
-                )
+                attacker_y = side["y_positions"].get(attacker["id"])
+                by_id = {p["id"]: p for p in defenders_pool}
+                marked_id = other["marking"].get_marker(attacker["id"], by_id.keys()) if other["marking"] else None
+                if marked_id:
+                    defender = by_id[marked_id]
+                else:
+                    defender = _pick_weighted(
+                        defenders_pool,
+                        lambda p: (_normalize_stat(p["fisico"]) + _normalize_stat(p["presion"]))
+                        * _proximity_weight(attacker_y, other["y_positions"].get(p["id"])),
+                    )
+                    if other["marking"]:
+                        other["marking"].assign(attacker["id"], defender["id"])
                 # Super técnica: a flashy move guarantees the outcome outright,
                 # skipping the normal stat-based duel. The defender's technique
                 # takes priority if both happen to roll one on the same play.
@@ -383,6 +510,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                     log.steals += 1
                     side["logs"][attacker["id"]].losses += 1
                     shift_momentum(other_key)
+                    ball_y = other["y_positions"].get(defender["id"], ball_y)
                     if log.steals <= STEAL_POINTS_CAP:
                         timeline.append((
                             minute,
@@ -414,6 +542,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                         log.steals += 1
                         side["logs"][attacker["id"]].losses += 1
                         shift_momentum(other_key)
+                        ball_y = other["y_positions"].get(defender["id"], ball_y)
                         if log.steals <= STEAL_POINTS_CAP:
                             timeline.append((
                                 minute,
@@ -426,6 +555,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                         log = other["logs"][defender["id"]]
                         log.clearances += 1
                         shift_momentum(other_key)
+                        ball_y = other["y_positions"].get(defender["id"], ball_y)
                         if log.clearances <= CLEARANCE_POINTS_CAP:
                             timeline.append((
                                 minute,
@@ -445,6 +575,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                 log = other["logs"][defender["id"]]
                 log.clearances += 1
                 shift_momentum(other_key)
+                ball_y = other["y_positions"].get(defender["id"], ball_y)
                 if log.clearances <= CLEARANCE_POINTS_CAP:
                     timeline.append((
                         minute,
@@ -455,15 +586,29 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
 
         elif roll < 0.82:
             # Interception: a midfielder reads the game and cuts out the pass.
-            intercept_pool = [p for p in other["lineup"] if p["posicion"] == "MF"] or other["outfield"]
+            intercept_pool = _nearby_pool(
+                [p for p in other["lineup"] if p["posicion"] == "MF"] or other["outfield"],
+                ball_y,
+                other["y_positions"],
+            )
             if intercept_pool:
-                defender = _pick_weighted(
-                    intercept_pool,
-                    lambda p: _normalize_stat(p["inteligencia"]) + _normalize_stat(p["presion"]),
-                )
+                attacker_y = side["y_positions"].get(attacker["id"])
+                by_id = {p["id"]: p for p in intercept_pool}
+                marked_id = other["marking"].get_marker(attacker["id"], by_id.keys()) if other["marking"] else None
+                if marked_id:
+                    defender = by_id[marked_id]
+                else:
+                    defender = _pick_weighted(
+                        intercept_pool,
+                        lambda p: (_normalize_stat(p["inteligencia"]) + _normalize_stat(p["presion"]))
+                        * _proximity_weight(attacker_y, other["y_positions"].get(p["id"])),
+                    )
+                    if other["marking"]:
+                        other["marking"].assign(attacker["id"], defender["id"])
                 log = other["logs"][defender["id"]]
                 log.interceptions += 1
                 shift_momentum(other_key)
+                ball_y = other["y_positions"].get(defender["id"], ball_y)
                 if log.interceptions <= INTERCEPTION_POINTS_CAP:
                     timeline.append((
                         minute,
@@ -480,14 +625,27 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
             # A nearby defender might smother the shot before it even
             # reaches the keeper — a last-ditch block, distinct from a
             # goalkeeper save and from a routine clearance/interception.
-            block_pool = [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"]
+            block_pool = _nearby_pool(
+                [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"],
+                ball_y,
+                other["y_positions"],
+            )
             blocker = None
             block_technique = None
             if block_pool:
-                candidate = _pick_weighted(
-                    block_pool,
-                    lambda p: _normalize_stat(p["fisico"]) + _normalize_stat(p["presion"]),
-                )
+                attacker_y = side["y_positions"].get(attacker["id"])
+                by_id = {p["id"]: p for p in block_pool}
+                marked_id = other["marking"].get_marker(attacker["id"], by_id.keys()) if other["marking"] else None
+                if marked_id:
+                    candidate = by_id[marked_id]
+                else:
+                    candidate = _pick_weighted(
+                        block_pool,
+                        lambda p: (_normalize_stat(p["fisico"]) + _normalize_stat(p["presion"]))
+                        * _proximity_weight(attacker_y, other["y_positions"].get(p["id"])),
+                    )
+                    if other["marking"]:
+                        other["marking"].assign(attacker["id"], candidate["id"])
                 block_technique = roll_super_technique(candidate, "defensa")
                 if block_technique:
                     blocker = candidate
@@ -501,6 +659,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                 log = other["logs"][blocker["id"]]
                 log.blocks += 1
                 shift_momentum(other_key)
+                ball_y = other["y_positions"].get(blocker["id"], ball_y)
                 if log.blocks <= BLOCK_POINTS_CAP:
                     if block_technique:
                         timeline.append((
@@ -526,7 +685,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                 atk_elem_bonus, def_elem_bonus = element_duel_bonus(attacker.get("elemento"), gk.get("elemento"))
                 shot_power += atk_elem_bonus
                 save_power += def_elem_bonus
-            goal_chance = 0.22 + (shot_power - save_power) * 0.3
+            goal_chance = 0.26 + (shot_power - save_power) * 0.3
+
+            # Shooting angle: a shot from right in front of goal is a much
+            # better chance than one from a tight angle out near the touch
+            # line — reuse the shooter's own lateral position for this.
+            shooter_y = side["y_positions"].get(attacker["id"], 50)
+            angle_penalty = abs(shooter_y - 50) / 50  # 0 = dead center, 1 = touchline
+            goal_chance -= angle_penalty * 0.13
 
             # Justicia: a well-organized defensive block is harder to break down.
             if "Justicia" in other["affinities"]:
@@ -589,9 +755,11 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label):
                 # Kick-off restart: possession is anyone's game again,
                 # rather than carrying over the scorer's momentum.
                 momentum = home_possession_prob
+                ball_y = 50.0
             elif gk and (save_technique or random.random() < 0.6):
                 other["logs"][gk["id"]].saves += 1
                 shift_momentum(other_key)
+                ball_y = 50.0
                 if save_technique:
                     timeline.append((
                         minute,
