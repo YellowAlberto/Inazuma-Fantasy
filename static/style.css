@@ -696,6 +696,23 @@ a:hover { text-decoration: underline; }
   padding-top: 20px;
   border-top: 1px solid var(--navy-600);
 }
+.home-social-links {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.home-social-links a, .home-social-item {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.home-social-links a:hover { color: var(--orange); }
+.home-social-links strong { color: var(--text-light); }
 
 /* New-squad popup */
 .modal-overlay {
