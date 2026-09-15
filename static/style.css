@@ -55,7 +55,7 @@ a:hover { text-decoration: underline; }
 }
 .navbar-links { display: flex; align-items: center; gap: 18px; }
 .navbar-user { color: var(--text-muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-.navbar-user:hover { color: var(--text-main); }
+.navbar-user:hover { color: var(--text-light); }
 .navbar-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); }
 .standings-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); vertical-align: middle; margin-right: 4px; }
 .profile-avatar-big {
@@ -72,6 +72,31 @@ a:hover { text-decoration: underline; }
   justify-content: center;
   font-size: 2.5rem;
   background: var(--navy-700);
+}
+.avatar-picker-trigger { position: relative; display: inline-block; flex-shrink: 0; }
+.avatar-picker-trigger-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: var(--orange);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  border: 2px solid var(--navy-800);
+}
+.avatar-picker-filters { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.avatar-picker-filters label { display: block; margin: 0 0 4px; font-size: 0.85rem; color: var(--text-muted); }
+.avatar-picker-filters input, .avatar-picker-filters select {
+  background: var(--navy-700);
+  border: 1px solid var(--navy-600);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text-light);
+  min-width: 160px;
 }
 
 .page-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 32px 80px; }

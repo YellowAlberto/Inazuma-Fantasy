@@ -9,13 +9,16 @@
 </div>
 
 <div class="card" style="display:flex; gap:20px; align-items:center;">
-  {% if user.avatar_sprite_url %}
-    <img src="{{ user.avatar_sprite_url }}" alt="Tu icono" class="profile-avatar-big">
-  {% else %}
-    <div class="profile-avatar-big profile-avatar-placeholder">👤</div>
-  {% endif %}
+  <a href="{{ url_for('profile', picker=1) }}" class="avatar-picker-trigger" title="Clic para cambiar tu icono">
+    {% if user.avatar_sprite_url %}
+      <img src="{{ user.avatar_sprite_url }}" alt="Tu icono" class="profile-avatar-big">
+    {% else %}
+      <div class="profile-avatar-big profile-avatar-placeholder">👤</div>
+    {% endif %}
+    <span class="avatar-picker-trigger-badge">✏️</span>
+  </a>
   <div>
-    <p class="muted" style="margin:0 0 10px;">Este es tu icono actual, visible junto a tu nombre en el menú y en la clasificación general.</p>
+    <p class="muted" style="margin:0 0 10px;">Este es tu icono actual, visible junto a tu nombre en el menú y en la clasificación general. Haz clic en él para cambiarlo.</p>
     {% if user.avatar_sprite_url %}
     <form method="post" action="{{ url_for('clear_avatar') }}">
       <button class="btn btn-secondary" type="submit">Quitar icono</button>
@@ -24,19 +27,39 @@
   </div>
 </div>
 
-<h2 class="section-title">Elegir un icono nuevo</h2>
-<div class="card">
-  <form method="get" action="{{ url_for('profile') }}" style="display:flex; gap:8px; align-items:flex-end;">
-    <div style="flex-grow:1;">
-      <label>Buscar un personaje por nombre</label>
-      <input type="text" name="q" value="{{ query }}" placeholder="Ej. Mark Evans" autofocus>
-    </div>
-    <button class="btn btn-primary" type="submit">Buscar</button>
-  </form>
+{% if picker_open %}
+<div class="modal-overlay" id="avatar-picker-modal">
+  <div class="modal-box" style="max-width:800px;">
+    <h2>Elegir un icono nuevo</h2>
+    <form method="get" action="{{ url_for('profile') }}" class="avatar-picker-filters">
+      <input type="hidden" name="picker" value="1">
+      <div>
+        <label>Temporada</label>
+        <select name="season">
+          <option value="">Todas</option>
+          {% for s in all_seasons %}
+          <option value="{{ s }}" {{ 'selected' if s == season else '' }}>{{ season_labels_es.get(s, s) }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div style="flex-grow:1;">
+        <label>Buscar por nombre</label>
+        <input type="text" name="q" value="{{ query }}" placeholder="Ej. Mark Evans">
+      </div>
+      <button class="btn btn-primary" type="submit">Buscar</button>
+    </form>
 
-  {% if query %}
-    {% if search_results %}
-    <div class="player-grid" style="margin-top:16px;">
+    {% if not query and not season %}
+    <p class="empty-state" style="margin-top:16px;">Elige una temporada o busca un nombre para ver personajes (hay más de 5000, así que no se muestran todos de golpe).</p>
+    {% elif search_results %}
+    <p class="muted" style="margin-top:12px;">
+      {% if result_count > result_limit %}
+        Mostrando {{ result_limit }} de {{ result_count }} resultados — afina la búsqueda para ver más concretos.
+      {% else %}
+        {{ result_count }} resultado{{ 's' if result_count != 1 else '' }}
+      {% endif %}
+    </p>
+    <div class="player-grid" style="margin-top:8px;">
       {% for p in search_results %}
       <div class="player-card">
         <div class="player-card-top">
@@ -51,6 +74,7 @@
           <form method="post" action="{{ url_for('set_avatar') }}">
             <input type="hidden" name="player_id" value="{{ p.id }}">
             <input type="hidden" name="q" value="{{ query }}">
+            <input type="hidden" name="season" value="{{ season }}">
             <button class="btn btn-primary btn-block" type="submit">Usar este icono</button>
           </form>
         </div>
@@ -58,8 +82,11 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="empty-state" style="margin-top:16px;">Sin resultados para "{{ query }}".</p>
+    <p class="empty-state" style="margin-top:16px;">Sin resultados para esa búsqueda.</p>
     {% endif %}
-  {% endif %}
+
+    <a href="{{ url_for('profile') }}" class="btn btn-ghost btn-block" style="margin-top:16px;">Cerrar</a>
+  </div>
 </div>
+{% endif %}
 {% endblock %}

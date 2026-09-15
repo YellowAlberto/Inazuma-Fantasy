@@ -798,17 +798,46 @@ def profile():
     db = get_db()
     user = row_to_dict(db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone())
 
+    picker_open = request.args.get("picker") == "1"
     query = request.args.get("q", "").strip()
+    season = request.args.get("season", "")
+
     search_results = []
-    if query:
+    result_count = 0
+    AVATAR_RESULT_LIMIT = 60
+    if picker_open and (query or season):
+        where = ["sprite_url IS NOT NULL"]
+        params = []
+        if season and season in SEASON_GROUPS:
+            juegos = SEASON_GROUPS[season]
+            where.append(f"juego IN ({','.join('?' for _ in juegos)})")
+            params.extend(juegos)
+        if query:
+            where.append("nombre LIKE ?")
+            params.append(f"%{query}%")
+        where_sql = " AND ".join(where)
+
+        result_count = db.execute(f"SELECT COUNT(*) as c FROM players WHERE {where_sql}", params).fetchone()["c"]
         search_results = rows_to_list(
             db.execute(
-                "SELECT id, nombre, posicion, sprite_url FROM players WHERE nombre LIKE ? AND sprite_url IS NOT NULL ORDER BY nombre LIMIT 30",
-                (f"%{query}%",),
+                f"SELECT id, nombre, posicion, sprite_url, juego FROM players WHERE {where_sql} ORDER BY nombre LIMIT ?",
+                params + [AVATAR_RESULT_LIMIT],
             ).fetchall()
         )
 
-    return render_template("profile.html", user=user, query=query, search_results=search_results, position_labels=POSITION_LABELS)
+    return render_template(
+        "profile.html",
+        user=user,
+        query=query,
+        season=season,
+        picker_open=picker_open,
+        search_results=search_results,
+        result_count=result_count,
+        result_limit=AVATAR_RESULT_LIMIT,
+        all_seasons=list(SEASON_GROUPS.keys()),
+        season_labels_es={s: season_label_es(s) for s in SEASON_GROUPS},
+        position_labels=POSITION_LABELS,
+    )
 
 
 @app.route("/profile/set-avatar", methods=["POST"])
@@ -817,15 +846,16 @@ def set_avatar():
     db = get_db()
     player_id = request.form.get("player_id", type=int)
     query = request.form.get("q", "")
+    season = request.form.get("season", "")
 
     if not player_id:
         flash("Selecciona un jugador válido.", "error")
-        return redirect(url_for("profile", q=query))
+        return redirect(url_for("profile", picker=1, q=query, season=season))
 
     player = db.execute("SELECT nombre, sprite_url FROM players WHERE id = ?", (player_id,)).fetchone()
     if not player or not player["sprite_url"]:
         flash("Ese jugador no tiene sprite disponible.", "error")
-        return redirect(url_for("profile", q=query))
+        return redirect(url_for("profile", picker=1, q=query, season=season))
 
     db.execute("UPDATE users SET avatar_sprite_url = ? WHERE id = ?", (player["sprite_url"], session["user_id"]))
     db.commit()
