@@ -288,10 +288,13 @@ document.addEventListener('DOMContentLoaded', function () {
       return null;
     }
 
-    function badgesForSide(sideKey, excludeId) {
+    function badgesForSide(sideKey, excludeId, excludeGoalkeepers) {
       var pool = [];
       badges.forEach(function (b) {
-        if (b.dataset.side === sideKey && parseInt(b.dataset.playerId, 10) !== excludeId) pool.push(b);
+        if (b.dataset.side !== sideKey) return;
+        if (parseInt(b.dataset.playerId, 10) === excludeId) return;
+        if (excludeGoalkeepers && b.dataset.position === 'GK') return;
+        pool.push(b);
       });
       return pool;
     }
@@ -403,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function () {
         activeBadge = badge;
 
         // A couple of teammates make a supporting run toward the ball...
-        var mates = pickRandom(badgesForSide(ev.side, ev.player_id), 2);
+        var mates = pickRandom(badgesForSide(ev.side, ev.player_id, true), 2);
         mates.forEach(function (m) {
           var mx = parseFloat(m.dataset.x);
           var my = parseFloat(m.dataset.y);
@@ -413,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // ...while a rival closes in to press.
         var otherSide = ev.side === 'home' ? 'away' : 'home';
-        var closers = pickRandom(badgesForSide(otherSide, null), 1);
+        var closers = pickRandom(badgesForSide(otherSide, null, true), 1);
         closers.forEach(function (c) {
           var cx = parseFloat(c.dataset.x);
           var cy = parseFloat(c.dataset.y);
@@ -430,6 +433,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var DRIFT_TOWARD_BALL = 0.16;
         badges.forEach(function (b) {
           if (b === activeBadge || activeSupportBadges.indexOf(b) !== -1) return;
+          if (b.dataset.position === 'GK') return; // goalkeepers never drift off their line
           var hx = parseFloat(b.dataset.x);
           var hy = parseFloat(b.dataset.y);
           moveBadgeTo(b, hx + (x - hx) * DRIFT_TOWARD_BALL, hy + (y - hy) * DRIFT_TOWARD_BALL);
@@ -485,10 +489,10 @@ document.addEventListener('DOMContentLoaded', function () {
         timer = setTimeout(function () {
           resetAllBadges();
           placeBall(50, 50); lastBallX = 50; lastBallY = 50;
-          timer = setTimeout(step, 700);
+          timer = setTimeout(step, 950);
         }, 600);
       } else {
-        timer = setTimeout(step, 700);
+        timer = setTimeout(step, 950);
       }
     }
 

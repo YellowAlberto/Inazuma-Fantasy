@@ -41,7 +41,7 @@
       <div class="replay-center-circle"></div>
 
       {% for p in f.pitch_home %}
-      <div class="pitch-mini-player" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="home"
+      <div class="pitch-mini-player" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="home" data-position="{{ p.posicion }}"
            style="left: {{ p.x }}%; top: {{ p.y }}%; --wobble-delay: {{ (p.id % 23) / 10 }}s;" title="{{ p.nombre }}">
         {% if p.sprite_url %}
           <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
@@ -51,7 +51,7 @@
       </div>
       {% endfor %}
       {% for p in f.pitch_away %}
-      <div class="pitch-mini-player pitch-mini-player-away" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="away"
+      <div class="pitch-mini-player pitch-mini-player-away" data-player-id="{{ p.id }}" data-x="{{ p.x }}" data-y="{{ p.y }}" data-side="away" data-position="{{ p.posicion }}"
            style="left: {{ p.x }}%; top: {{ p.y }}%; --wobble-delay: {{ (p.id % 19) / 10 }}s;" title="{{ p.nombre }}">
         {% if p.sprite_url %}
           <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
