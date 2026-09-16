@@ -306,6 +306,7 @@ def _run_migrations(conn):
     _backfill_sprites_from_seed(conn)
     _backfill_techniques_from_seed(conn)
     _backfill_technique_categories_from_seed(conn)
+    _resync_expanded_techniques_from_seed(conn)
     _backfill_scout_flags_from_seed(conn)
     _backfill_victory_road_club_scout_fix(conn)
 
@@ -388,6 +389,42 @@ def _backfill_technique_categories_from_seed(conn):
                 "UPDATE players SET tecnicas_por_tipo = ? WHERE id = ?",
                 (json.dumps(p["tecnicas_por_tipo"], ensure_ascii=False), p["id"]),
             )
+
+
+def _resync_expanded_techniques_from_seed(conn):
+    """One-time refresh: a much bigger, fully-categorized técnica dataset
+    (~39,000 rows, 97% character coverage) replaced the earlier partial one
+    (~62% coverage). Detects whether this newer set has already been
+    applied (via a known example move) and, if not, re-syncs `tecnicas`
+    and `tecnicas_por_tipo` from the bundled seed data for every player —
+    not just the ones that were previously empty, since many already had
+    some (smaller/older) data that needs overwriting, not just filling in."""
+    already_resynced = conn.execute(
+        "SELECT tecnicas_por_tipo FROM players WHERE nombre = 'Mark Evans' LIMIT 1"
+    ).fetchone()
+    if already_resynced:
+        try:
+            by_type = json.loads(already_resynced["tecnicas_por_tipo"] or "{}")
+        except (ValueError, TypeError):
+            by_type = {}
+        if "Mano celestial" in (by_type.get("porteria") or []):
+            return
+
+    try:
+        with open(SEED_PATH, encoding="utf-8") as f:
+            seed_players = json.load(f)
+    except FileNotFoundError:
+        return
+
+    for p in seed_players:
+        conn.execute(
+            "UPDATE players SET tecnicas = ?, tecnicas_por_tipo = ? WHERE id = ?",
+            (
+                json.dumps(p.get("tecnicas") or [], ensure_ascii=False),
+                json.dumps(p.get("tecnicas_por_tipo") or {}, ensure_ascii=False),
+                p["id"],
+            ),
+        )
 
 
 def _backfill_scout_flags_from_seed(conn):
