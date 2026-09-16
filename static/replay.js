@@ -408,6 +408,15 @@ document.addEventListener('DOMContentLoaded', function () {
         lastBallY = y;
         moveBadgeTo(badge, x, y);
         placeBall(x, y);
+        if (ev.type === 'goal') {
+          // The shooter stays put after striking it — only the ball
+          // keeps traveling, the rest of the way into the actual net,
+          // arriving a beat later than the player themselves.
+          var goalX = ev.side === 'home' ? 97 : 3;
+          setTimeout(function () {
+            placeBall(goalX, y);
+          }, 600);
+        }
         badge.classList.remove('pitch-mini-player-glow', 'pitch-mini-player-glow-goal');
         void badge.offsetWidth; // force reflow so the glow can restart
         badge.classList.add((ev.type === 'goal' || ev.super_technique) ? 'pitch-mini-player-glow-goal' : 'pitch-mini-player-glow');
@@ -474,10 +483,11 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       if (ev.type === 'goal') {
-        // Let the ball actually travel to the net first (matching the 0.6s
-        // move transition) — the flash, sound, score and caption all land
-        // right as it arrives, not before it's even left the shooter.
-        setTimeout(applyGoalEffectsAndCaption, 600);
+        // Let the ball actually travel all the way to the net first — the
+        // shooter moves into position (0.6s), then the ball alone
+        // continues on into the goal (another 0.6s) — the flash, sound,
+        // score and caption all land right as it crosses the line.
+        setTimeout(applyGoalEffectsAndCaption, 1200);
       } else {
         applyGoalEffectsAndCaption();
       }
@@ -506,11 +516,14 @@ document.addEventListener('DOMContentLoaded', function () {
         if (ev.type === 'goal') {
           // Kick-off: everyone drifts back to their formation spot after a
           // goal, just like a real restart, before the next play continues.
+          // Waits for the full shoot-then-ball-enters-net sequence (1200ms)
+          // plus another beat to actually see the goal celebration, before
+          // resetting everyone back to their spots.
           timer = setTimeout(function () {
             resetAllBadges();
             placeBall(50, 50); lastBallX = 50; lastBallY = 50;
             timer = setTimeout(step, 950);
-          }, 600);
+          }, 1800);
         } else {
           timer = setTimeout(step, 950);
         }
