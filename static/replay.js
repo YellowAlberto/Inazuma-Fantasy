@@ -450,26 +450,37 @@ document.addEventListener('DOMContentLoaded', function () {
         activeBadge = null;
       }
 
-      if (ev.type === 'goal') {
-        if (ev.side === 'home') homeGoals++; else awayGoals++;
-        updateScoreboard();
-        flashGoal(ev.side === 'home' ? 'right' : 'left');
-      }
-      clock.textContent = "Min " + ev.minute + "'";
-      if (ev.super_technique) playSoundFor('super_technique');
-      playSoundFor(ev.type);
+      function applyGoalEffectsAndCaption() {
+        if (ev.type === 'goal') {
+          if (ev.side === 'home') homeGoals++; else awayGoals++;
+          updateScoreboard();
+          flashGoal(ev.side === 'home' ? 'right' : 'left');
+        }
+        clock.textContent = "Min " + ev.minute + "'";
+        if (ev.super_technique) playSoundFor('super_technique');
+        playSoundFor(ev.type);
 
-      var teamLabel = ev.side === 'home' ? homeLabel : awayLabel;
-      var text;
-      if (ev.type === 'clean_sheet') {
-        text = ICONS.clean_sheet + ' para ' + teamLabel;
-      } else if (ev.super_technique) {
-        text = '✨ ¡SÚPER TÉCNICA! ' + ev.technique_name + ' — ' + ev.player + ' (' + teamLabel + ')';
-      } else {
-        text = (ICONS[ev.type] || '') + (ev.player ? ' — ' + ev.player : '') + ' (' + teamLabel + ')';
-        if (ev.type === 'goal' && ev.assist) text += ' [asist. ' + ev.assist + ']';
+        var teamLabel = ev.side === 'home' ? homeLabel : awayLabel;
+        var text;
+        if (ev.type === 'clean_sheet') {
+          text = ICONS.clean_sheet + ' para ' + teamLabel;
+        } else if (ev.super_technique) {
+          text = '✨ ¡SÚPER TÉCNICA! ' + ev.technique_name + ' — ' + ev.player + ' (' + teamLabel + ')';
+        } else {
+          text = (ICONS[ev.type] || '') + (ev.player ? ' — ' + ev.player : '') + ' (' + teamLabel + ')';
+          if (ev.type === 'goal' && ev.assist) text += ' [asist. ' + ev.assist + ']';
+        }
+        caption.textContent = text;
       }
-      caption.textContent = text;
+
+      if (ev.type === 'goal') {
+        // Let the ball actually travel to the net first (matching the 0.6s
+        // move transition) — the flash, sound, score and caption all land
+        // right as it arrives, not before it's even left the shooter.
+        setTimeout(applyGoalEffectsAndCaption, 600);
+      } else {
+        applyGoalEffectsAndCaption();
+      }
     }
 
     function step() {
