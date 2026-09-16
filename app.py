@@ -59,6 +59,21 @@ CPU_BID_CHANCE = 0.65
 # market players, so they build up a "points hechos" track record too.
 MARKET_SIM_USER_ID = -2
 MAX_LEAGUE_MEMBERS = 10
+
+
+def _load_rotulos_manifest():
+    """Maps a técnica's Spanish name to its 'rótulo' label graphic
+    (static/rotulos/<skill_id>.webp), when we have one on file. Loaded once
+    at import time from the bundled lookup table."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed", "rotulos_manifest.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+ROTULOS_MANIFEST = _load_rotulos_manifest()
 MAX_LEAGUE_CYCLES = 3  # a league runs for 3 full round-robin cycles (everyone plays everyone 3 times) before it ends and crowns a champion
 AVATAR_RESULT_LIMIT = 60
 
@@ -2176,6 +2191,11 @@ def gameweek_detail(league_id, number):
             f["events"] = json.loads(f["events_json"]) if f["events_json"] else []
         except (ValueError, TypeError):
             f["events"] = []
+        for ev in f["events"]:
+            if ev.get("super_technique"):
+                skill_id = ROTULOS_MANIFEST.get(ev.get("technique_name", ""))
+                if skill_id:
+                    ev["rotulo_url"] = url_for("static", filename=f"rotulos/{skill_id}.webp")
         try:
             home_lineup_data = json.loads(f["home_lineup_json"]) if f["home_lineup_json"] else []
             away_lineup_data = json.loads(f["away_lineup_json"]) if f["away_lineup_json"] else []

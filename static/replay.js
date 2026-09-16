@@ -255,6 +255,8 @@ document.addEventListener('DOMContentLoaded', function () {
     var ball = container.querySelector('.replay-ball');
     var clock = container.querySelector('.replay-clock');
     var caption = container.querySelector('.replay-caption');
+    var rotuloBanner = container.querySelector('.rotulo-banner');
+    var rotuloImg = rotuloBanner ? rotuloBanner.querySelector('img') : null;
     var playBtn = container.querySelector('.replay-play');
     var restartBtn = container.querySelector('.replay-restart');
     var muteBtn = container.querySelector('.replay-mute');
@@ -368,6 +370,10 @@ document.addEventListener('DOMContentLoaded', function () {
       hidePoints();
       caption.textContent = 'Pulsa reproducir para ver la repetición del partido.';
       playBtn.textContent = '▶️ Reproducir';
+      if (rotuloBanner) {
+        rotuloBanner.classList.remove('rotulo-visible');
+        rotuloBanner.style.display = 'none';
+      }
     }
 
     function renderEvent(ev) {
@@ -485,16 +491,38 @@ document.addEventListener('DOMContentLoaded', function () {
       renderEvent(ev);
       idx++;
 
-      if (ev.type === 'goal') {
-        // Kick-off: everyone drifts back to their formation spot after a
-        // goal, just like a real restart, before the next play continues.
-        timer = setTimeout(function () {
-          resetAllBadges();
-          placeBall(50, 50); lastBallX = 50; lastBallY = 50;
+      function continueToNext() {
+        if (ev.type === 'goal') {
+          // Kick-off: everyone drifts back to their formation spot after a
+          // goal, just like a real restart, before the next play continues.
+          timer = setTimeout(function () {
+            resetAllBadges();
+            placeBall(50, 50); lastBallX = 50; lastBallY = 50;
+            timer = setTimeout(step, 950);
+          }, 600);
+        } else {
           timer = setTimeout(step, 950);
-        }, 600);
+        }
+      }
+
+      if (ev.rotulo_url && rotuloBanner && rotuloImg) {
+        // A super técnica just happened — freeze on its official label
+        // banner for a beat, long enough to actually read it, before the
+        // match carries on.
+        rotuloImg.src = ev.rotulo_url;
+        rotuloImg.alt = ev.technique_name || '';
+        rotuloBanner.style.display = 'flex';
+        void rotuloBanner.offsetWidth; // force reflow so the fade-in transition plays
+        rotuloBanner.classList.add('rotulo-visible');
+        timer = setTimeout(function () {
+          rotuloBanner.classList.remove('rotulo-visible');
+          setTimeout(function () {
+            rotuloBanner.style.display = 'none';
+          }, 250);
+          continueToNext();
+        }, 1500);
       } else {
-        timer = setTimeout(step, 950);
+        continueToNext();
       }
     }
 
