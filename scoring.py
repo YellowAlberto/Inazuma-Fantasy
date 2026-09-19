@@ -125,6 +125,7 @@ def formation_requirements(formation_key):
 APPEARANCE_POINTS = 2
 ASSIST_POINTS = 3
 GOAL_POINTS = {"GK": 6, "DF": 6, "MF": 5, "FW": 4}  # same scale LaLiga Fantasy MARCA uses
+KEY_PASS_GOAL_CHANCE_BONUS = 0.1  # small boost if the exact receiver shoots on their team's very next play
 CLEAN_SHEET_POINTS = {"GK": 3, "DF": 3, "MF": 2, "FW": 1}
 SAVE_POINTS = 1
 STEAL_POINTS = 1
@@ -136,6 +137,7 @@ KEY_PASS_POINTS = 1
 KEY_PASS_POINTS_CAP = 3
 CLEARANCE_POINTS = 1
 CLEARANCE_POINTS_CAP = 3
+CLEARANCE_RECOVERED_BY_OWN_TEAM_CHANCE = 0.28  # a hoofed clearance mostly goes to the pressing side, not back to a teammate
 INTERCEPTION_POINTS = 1
 INTERCEPTION_POINTS_CAP = 3
 BLOCK_POINTS_PER_UNIT = 2  # every N blocks = 1 point
@@ -354,6 +356,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             "affinities": active_match_affinities(home_lineup),
             "y_positions": _compute_lineup_y_positions(home_lineup),
             "marking": MarkingMemory() if use_marking_memory else None,
+            "primed_receiver_id": None,
         },
         "away": {
             "lineup": away_lineup,
@@ -366,6 +369,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             "affinities": active_match_affinities(away_lineup),
             "y_positions": _compute_lineup_y_positions(away_lineup),
             "marking": MarkingMemory() if use_marking_memory else None,
+            "primed_receiver_id": None,
         },
     }
 
@@ -406,6 +410,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
         side_key = "home" if random.random() < momentum else "away"
         other_key = "away" if side_key == "home" else "home"
         side, other = sides[side_key], sides[other_key]
+
+        # A key pass "primes" its specific recipient for one play only: if
+        # THIS is that play and it resolves as a shot from that exact
+        # player, they get a small boosted chance to score. Consumed here
+        # (single-use) regardless of what actually happens this turn, since
+        # by definition the window was only ever "their team's next play".
+        primed_shooter_id = side["primed_receiver_id"]
+        side["primed_receiver_id"] = None
 
         if use_marking_memory:
             sides["home"]["marking"].tick()
@@ -451,6 +463,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             # themselves (a dribble) instead of passing at all.
             attacker_y_here = side["y_positions"].get(attacker["id"], 50)
             teammates = [p for p in attackers if p["id"] != attacker["id"]]
+            recipient = None
             if teammates and random.random() >= 0.25:
                 recipient = _pick_weighted(
                     teammates,
@@ -461,32 +474,50 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 
             side["last_passer"] = attacker
             # Afinidad: sharp team chemistry turns some routine passes into
-            # genuine chances on their own.
-            if "Afinidad" in side["affinities"] and random.random() < 0.35 * affinity_scale(side["affinities"]["Afinidad"]):
+            # genuine chances on their own — but only counts as a real "key
+            # pass" (and primes its recipient for a boosted next shot) when
+            # the ball actually went to a teammate, not a solo run.
+            if (
+                recipient is not None
+                and "Afinidad" in side["affinities"]
+                and random.random() < 0.35 * affinity_scale(side["affinities"]["Afinidad"])
+            ):
                 log = side["logs"][attacker["id"]]
                 log.key_passes += 1
+                side["primed_receiver_id"] = recipient["id"]
                 if log.key_passes <= KEY_PASS_POINTS_CAP:
                     timeline.append((
                         minute,
-                        f"🔑 Pase clave de {attacker['nombre']} ({side['label']})",
+                        f"🔑 Pase clave de {attacker['nombre']} para {recipient['nombre']} ({side['label']})",
                         {"minute": minute, "type": "key_pass", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url")},
                     ))
 
         elif roll < 0.40:
-            # Key pass: a playmaker threads a dangerous ball through. Earns a
-            # small reward on its own, and counts as a strong assist setup.
+            # Key pass: a playmaker threads a dangerous ball through to a
+            # specific teammate. Earns a small reward on its own, counts as
+            # a strong assist setup, and primes that recipient for a
+            # boosted chance to score IF their team's very next play is
+            # them taking a shot.
             passer_pool = [p for p in attackers if p["posicion"] in ("MF", "FW")] or attackers
             passer = _pick_weighted(
                 passer_pool,
                 lambda p: _normalize_stat(p["control"]) + _normalize_stat(p["tecnica"]),
             )
+            passer_y = side["y_positions"].get(passer["id"], 50)
+            recipient_pool = [p for p in attackers if p["id"] != passer["id"]] or [passer]
+            recipient = _pick_weighted(
+                recipient_pool,
+                lambda p: _proximity_weight(passer_y, side["y_positions"].get(p["id"])),
+            )
             log = side["logs"][passer["id"]]
             log.key_passes += 1
             side["last_passer"] = passer
+            side["primed_receiver_id"] = recipient["id"]
+            ball_y = side["y_positions"].get(recipient["id"], ball_y)
             if log.key_passes <= KEY_PASS_POINTS_CAP:
                 timeline.append((
                     minute,
-                    f"🔑 Pase clave de {passer['nombre']} ({side['label']})",
+                    f"🔑 Pase clave de {passer['nombre']} para {recipient['nombre']} ({side['label']})",
                     {"minute": minute, "type": "key_pass", "side": side_key, "player": passer["nombre"], "player_id": passer["id"], "sprite_url": passer.get("sprite_url")},
                 ))
 
@@ -577,7 +608,13 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             side["last_passer"] = None
 
         elif roll < 0.72:
-            # Clearance: a defender (or keeper) hoofs a dangerous ball away.
+            # Clearance: a defender (or keeper) under pressure just hoofs
+            # the ball away rather than risking a pass — it's an unaimed
+            # ball upfield, so it mostly falls to the pressing side (who
+            # usually have more bodies up there ready for the loose ball),
+            # with only a small chance a teammate of the clearer actually
+            # recovers it. The clearance itself is still worth crediting to
+            # the defender regardless of where the ball ends up.
             clear_pool = [p for p in other["lineup"] if p["posicion"] in ("DF", "GK")] or other["outfield"]
             if clear_pool:
                 defender = _pick_weighted(
@@ -586,14 +623,20 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 )
                 log = other["logs"][defender["id"]]
                 log.clearances += 1
-                shift_momentum(other_key)
-                ball_y = other["y_positions"].get(defender["id"], ball_y)
                 if log.clearances <= CLEARANCE_POINTS_CAP:
                     timeline.append((
                         minute,
                         f"🧹 Despeje de {defender['nombre']} ({other['label']})",
                         {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
                     ))
+                if random.random() < CLEARANCE_RECOVERED_BY_OWN_TEAM_CHANCE:
+                    # A teammate of the clearer actually gets to the loose ball.
+                    shift_momentum(other_key)
+                    ball_y = other["y_positions"].get(defender["id"], ball_y)
+                else:
+                    # Falls to the team that was pressuring in the first place.
+                    shift_momentum(side_key)
+                    ball_y = max(15.0, min(85.0, ball_y + random.uniform(-15, 15)))
             side["last_passer"] = None
 
         elif roll < 0.82:
@@ -718,6 +761,13 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             # Tensión: thrives under pressure in the closing stages.
             if "Tensión" in side["affinities"] and minute >= 70:
                 goal_chance += 0.08 * affinity_scale(side["affinities"]["Tensión"])
+
+            # A key pass primed exactly this player: if their team's very
+            # next play is them shooting, they get a small boosted chance
+            # to convert it, on top of everything else above.
+            primed_for_this_shot = primed_shooter_id is not None and attacker["id"] == primed_shooter_id
+            if primed_for_this_shot:
+                goal_chance += KEY_PASS_GOAL_CHANCE_BONUS
 
             # Cautious opening exchanges: both sides feel each other out
             # before really committing to chances.
