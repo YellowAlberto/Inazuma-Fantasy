@@ -1063,10 +1063,13 @@ def _scout_filter_sql(scout_filter):
     return ""
 
 
-def generate_balanced_roster(db, budget, seasons=None, exclude_ids=None, scout_filter=None):
+def generate_balanced_roster(db, budget, seasons=None, exclude_ids=None, scout_filter=None, pool_ids=None):
     """Auto-generates a FREE starting 11 (4-4-2) for a new team so every team
     in a league starts with a roughly similar total squad value, without
-    spending any of their transfer budget."""
+    spending any of their transfer budget. When `pool_ids` is given, only
+    picks from that closed set of players (used for CPU/NPC opponents, so
+    they draw from the same fixed league pool as the market instead of the
+    whole database)."""
     target_per_slot = budget / 11
     picked_ids = []
     picked_total = 0.0
@@ -1080,6 +1083,12 @@ def generate_balanced_roster(db, budget, seasons=None, exclude_ids=None, scout_f
         season_params = list(seasons)
 
     scout_where = _scout_filter_sql(scout_filter)
+
+    pool_where = ""
+    pool_params = []
+    if pool_ids:
+        pool_where = f"AND id IN ({','.join('?' for _ in pool_ids)})"
+        pool_params = list(pool_ids)
 
     for pos, count in STARTER_FORMATION:
         for _ in range(count):
@@ -1097,11 +1106,11 @@ def generate_balanced_roster(db, budget, seasons=None, exclude_ids=None, scout_f
             rows = db.execute(
                 f"""
                 SELECT id, price FROM players
-                WHERE posicion = ? {season_where} {scout_where} {exclude_sql}
+                WHERE posicion = ? {season_where} {scout_where} {pool_where} {exclude_sql}
                 ORDER BY ABS(price - ?) ASC
                 LIMIT 25
                 """,
-                [pos] + season_params + exclude_params + [target],
+                [pos] + season_params + pool_params + exclude_params + [target],
             ).fetchall()
 
             if not rows:

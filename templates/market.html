@@ -41,32 +41,39 @@
   <button class="btn btn-primary" type="submit">Filtrar</button>
 </form>
 
+<p class="muted player-detail-hint">👆 Toca un personaje para ver sus estadísticas, sus puntos por jornada y la evolución de su valor.</p>
+
 <div class="player-grid">
   {% for p in players %}
   <div class="player-card">
-    <div class="player-card-top">
-      <span class="player-position-badge">{{ p.posicion }}</span>
-      <span class="player-price">Valor: {{ (p.market_value or p.price)|euros }}</span>
-    </div>
-    <div class="player-sprite-wrap">
-      {% if p.sprite_url %}
-        <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
-      {% else %}
-        <div class="player-sprite player-sprite-placeholder">⚽</div>
-      {% endif %}
-    </div>
-    <div class="player-card-body">
-      <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-      <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
-      {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
-      <div class="player-meta player-meta-small">{{ p.juego | display_season }}</div>
-      <div class="player-meta player-meta-small">🏆 {{ p.total_points }} pts hechos</div>
-      {% if p.seller_team_name %}
-        <div class="player-meta player-meta-small">Vendido por: <strong>{{ p.seller_team_name }}</strong></div>
-      {% endif %}
-      {% if p.has_cpu_offer %}
-        <div class="cpu-offer-hint">📡 Hay interés de fuera de la liga por este jugador</div>
-      {% endif %}
+    <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
+      <div class="player-card-top">
+        <span class="player-position-badge">{{ p.posicion }}</span>
+        <span class="player-price">Valor: {{ (p.market_value or p.price)|euros }}</span>
+      </div>
+      <div class="player-sprite-wrap">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+        {% else %}
+          <div class="player-sprite player-sprite-placeholder">⚽</div>
+        {% endif %}
+      </div>
+      <div class="player-card-body">
+        <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+        <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+        {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+        <div class="player-meta player-meta-small">{{ p.juego | display_season }}</div>
+        <div class="player-meta player-meta-small">🏆 {{ p.total_points }} pts hechos</div>
+        {% if p.bid_count %}
+          <div class="player-meta player-meta-small">✋ {{ p.bid_count }} puja{{ 's' if p.bid_count != 1 else '' }}</div>
+        {% endif %}
+        {% if p.seller_team_name %}
+          <div class="player-meta player-meta-small">Vendido por: <strong>{{ p.seller_team_name }}</strong></div>
+        {% endif %}
+        {% if p.has_cpu_offer %}
+          <div class="cpu-offer-hint">📡 Hay interés de fuera de la liga por este jugador</div>
+        {% endif %}
+      </div>
     </div>
     {% if not market_resolved %}
     <form method="post" action="{{ url_for('place_bid', league_id=league.id, player_id=p.id) }}" class="bid-form">

@@ -51,26 +51,29 @@
 {% endif %}
 
 <h2 class="section-title">Plantilla completa ({{ squad|length }} jugadores)</h2>
+<p class="muted player-detail-hint">👆 Toca un personaje para ver sus estadísticas, sus puntos por jornada y la evolución de su valor.</p>
 <div class="player-grid">
   {% for p in squad %}
   <div class="player-card {{ 'player-card-starter' if p.in_lineup else '' }}">
-    <div class="player-card-top">
-      <span class="player-position-badge">{{ p.posicion }}</span>
-      <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
-    </div>
-    <div class="player-sprite-wrap">
-      {% if p.sprite_url %}
-        <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
-      {% else %}
-        <div class="player-sprite player-sprite-placeholder">⚽</div>
-      {% endif %}
-    </div>
-    <div class="player-card-body">
-      <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-      <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
-      {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
-      {% if p.in_lineup %}<span class="player-archetype" style="background: var(--orange); color: #1a0d00;">Titular</span>{% endif %}
-      <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
+    <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
+      <div class="player-card-top">
+        <span class="player-position-badge">{{ p.posicion }}</span>
+        <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
+      </div>
+      <div class="player-sprite-wrap">
+        {% if p.sprite_url %}
+          <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}" class="player-sprite" loading="lazy">
+        {% else %}
+          <div class="player-sprite player-sprite-placeholder">⚽</div>
+        {% endif %}
+      </div>
+      <div class="player-card-body">
+        <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
+        <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+        {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+        {% if p.in_lineup %}<span class="player-archetype" style="background: var(--orange); color: #1a0d00;">Titular</span>{% endif %}
+        <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
+      </div>
     </div>
     {% if can_buy_clause %}
     <form method="post" action="{{ url_for('buy_clause', league_id=league.id, player_id=p.id) }}"
@@ -81,7 +84,10 @@
   </div>
   {% endfor %}
   {% if not squad %}
-    <p class="empty-state">Este equipo todavía no tiene ningún jugador.</p>
+    <div class="empty-box">
+      <div class="empty-box-icon">⚽</div>
+      <p>Este equipo todavía no tiene ningún jugador.</p>
+    </div>
   {% endif %}
 </div>
 {% endblock %}

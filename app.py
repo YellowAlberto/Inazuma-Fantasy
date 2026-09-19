@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover - extremely unlikely on a modern Python
     MADRID_TZ = None
 
 import requests
-from flask import Flask, g, redirect, render_template, request, session, url_for, flash
+from flask import Flask, g, jsonify, redirect, render_template, request, session, url_for, flash
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import get_connection, init_db
@@ -458,35 +458,26 @@ def refresh_league_market(db, league):
                 "INSERT INTO league_player_value (league_id, player_id, value) VALUES (?, ?, ?)",
                 (league["id"], pid, base_price),
             )
-    # Give the freshly-listed market a simulated performance right away, so
-    # players show plausible "puntos hechos" from the moment they appear
-    # instead of sitting at 0 until the league's first real jornada.
-    simulate_points_for_market_pool(db, league["id"])
+    # NOTE: market players intentionally do NOT get simulated points here.
+    # Their "puntos hechos" should only start moving once the league has
+    # actually played a real jornada (see play_gameweek_for_league), so a
+    # brand new league's market correctly shows 0 for everyone until then.
 
 
-def latest_gameweek_id(db, league_id):
-    """The most recently played real gameweek for a league, if any. Used to
-    file the market's own simulated performance under *some* gameweek
-    bucket, since a market rotation isn't itself a real match day."""
-    row = db.execute(
-        "SELECT id FROM gameweeks WHERE league_id = ? ORDER BY number DESC LIMIT 1", (league_id,)
-    ).fetchone()
-    return row["id"] if row else None
-
-
-def simulate_points_for_market_pool(db, league_id):
+def simulate_points_for_market_pool(db, league_id, gw_id):
     """Gives every player currently sitting unclaimed in the market a
-    simulated performance, so their value/"puntos hechos" keeps moving even
-    if nobody in the league owns them yet -- and so they show a plausible
-    points total (as if they'd played some gameweek) from the moment they
-    first appear, not just after the league's first real jornada.
+    simulated performance, so their "puntos hechos" keeps moving as the
+    league's real jornadas get played -- even though these players aren't
+    owned by anyone and so never take part in a simulated fixture directly.
 
-    That running total lives in market_simulated_points, independent of the
-    real gameweeks table, since a market rotation isn't a real match day and
-    a brand new league doesn't have any gameweeks yet. When a real gameweek
-    *does* exist, the same points are also filed under it (as before) so
-    older per-gameweek views keep working."""
-    gw_id = latest_gameweek_id(db, league_id)
+    Called once per real jornada played (from play_gameweek_for_league),
+    right after that jornada's gameweek row is created, so market points
+    only start accumulating once jornadas actually start being played --
+    a brand new league's market correctly shows 0 "puntos hechos" until its
+    first jornada. The running total lives in market_simulated_points,
+    independent of the real gameweeks table; the same points are also filed
+    under the just-played gameweek (via gw_id) so older per-gameweek views
+    keep working."""
     pool_players = rows_to_list(
         db.execute(
             "SELECT p.* FROM league_market lm JOIN players p ON p.id = lm.player_id WHERE lm.league_id = ?",
@@ -569,7 +560,7 @@ def rotate_market_for_league(db, league_id):
     db.execute("DELETE FROM league_market WHERE league_id = ?", (league_id,))
 
     league = row_to_dict(db.execute("SELECT * FROM leagues WHERE id = ?", (league_id,)).fetchone())
-    refresh_league_market(db, league)  # this also simulates points for the fresh listing
+    refresh_league_market(db, league)
     db.commit()
 
 
@@ -719,6 +710,7 @@ def play_gameweek_for_league(db, league_id):
 
     already_owned = owned_player_ids(db, league_id)
     seasons = league_seasons_list(league)
+    league_pool_ids = ensure_league_pool(db, league)
 
     for home_m, away_m in pairs:
         home_lineup = get_lineup(home_m["user_id"])
@@ -729,10 +721,18 @@ def play_gameweek_for_league(db, league_id):
             away_label = away_m["team_name"]
             away_user_id = away_m["user_id"]
         else:
-            # Improvise a balanced NPC squad from players nobody in this
-            # league currently owns, so it doesn't interfere with the market.
+            # Improvise a balanced NPC squad drawn from the league's own
+            # fixed player pool (same closed set the market rotates
+            # through), excluding anyone already owned, so CPU opponents
+            # don't interfere with the market or introduce players from
+            # outside the pool.
             npc_ids = generate_balanced_roster(
-                db, league["budget"], seasons=seasons, exclude_ids=already_owned, scout_filter=league["scout_filter"]
+                db,
+                league["budget"],
+                seasons=seasons,
+                exclude_ids=already_owned,
+                scout_filter=league["scout_filter"],
+                pool_ids=league_pool_ids,
             )
             if npc_ids:
                 placeholders = ",".join("?" for _ in npc_ids)
@@ -795,6 +795,13 @@ def play_gameweek_for_league(db, league_id):
     db.execute("UPDATE leagues SET current_gameweek = ? WHERE id = ?", (next_number, league_id))
     if next_number >= max_gameweeks:
         db.execute("UPDATE leagues SET ended = 1 WHERE id = ?", (league_id,))
+
+    # Now that a real jornada has actually been played, give whoever is
+    # currently sitting unclaimed in the market a simulated performance for
+    # it too, so their "puntos hechos" grows in step with real jornadas
+    # instead of existing before any jornada has been played.
+    simulate_points_for_market_pool(db, league_id, gameweek_id)
+
     db.commit()
     return True, next_number
 
@@ -1464,7 +1471,8 @@ def market(league_id):
                    seller.team_name as seller_team_name,
                    COALESCE(msp.points, 0) as total_points,
                    EXISTS(SELECT 1 FROM bids cb WHERE cb.league_id = lm.league_id AND cb.player_id = p.id
-                          AND cb.user_id = ?) as has_cpu_offer
+                          AND cb.user_id = ?) as has_cpu_offer,
+                   (SELECT COUNT(*) FROM bids bc WHERE bc.league_id = lm.league_id AND bc.player_id = p.id) as bid_count
             FROM league_market lm
             JOIN players p ON p.id = lm.player_id
             LEFT JOIN league_player_value lpv ON lpv.league_id = lm.league_id AND lpv.player_id = lm.player_id
@@ -1512,6 +1520,90 @@ def market(league_id):
         arquetipo=arquetipo,
         sort=sort,
         arquetipos=arquetipos,
+    )
+
+
+@app.route("/leagues/<int:league_id>/players/<int:player_id>/detail")
+@login_required
+def player_detail_json(league_id, player_id):
+    """JSON detail for the player-card popup: base stats, points per jornada
+    played in this league (whether the player was owned or sitting unclaimed
+    in the market that week), and the resulting market-value trajectory."""
+    league, membership = require_membership(league_id)
+    if not league:
+        return jsonify({"error": "No perteneces a esta liga."}), 403
+
+    db = get_db()
+    player = db.execute("SELECT * FROM players WHERE id = ?", (player_id,)).fetchone()
+    if not player:
+        return jsonify({"error": "Jugador no encontrado."}), 404
+    player = row_to_dict(player)
+
+    value_row = db.execute(
+        "SELECT value FROM league_player_value WHERE league_id = ? AND player_id = ?",
+        (league_id, player_id),
+    ).fetchone()
+    current_value_points = round(value_row["value"] if value_row else player["price"])
+
+    score_rows = rows_to_list(
+        db.execute(
+            """
+            SELECT gw.number AS gameweek, SUM(gs.points) AS points
+            FROM gameweek_scores gs
+            JOIN gameweeks gw ON gw.id = gs.gameweek_id
+            WHERE gs.league_id = ? AND gs.player_id = ?
+            GROUP BY gw.number
+            ORDER BY gw.number
+            """,
+            (league_id, player_id),
+        ).fetchall()
+    )
+    points_by_gw = {r["gameweek"]: r["points"] for r in score_rows}
+
+    # Replay the same value-adjustment formula used live, jornada by
+    # jornada, to reconstruct how this player's value moved over time —
+    # there's no separate history table, but the formula is deterministic
+    # so replaying it from the base price reproduces the real trajectory.
+    base_price = player["price"]
+    value = base_price
+    value_history = []
+    for gw in range(1, (league["current_gameweek"] or 0) + 1):
+        pts = points_by_gw.get(gw)
+        if pts is not None:
+            value = adjust_player_value(value, pts, base_price)
+        value_history.append(
+            {
+                "gameweek": gw,
+                "value_millions": round(points_to_euros_millions(value), 2),
+                "value_label": format_euros(value),
+            }
+        )
+
+    return jsonify(
+        {
+            "id": player["id"],
+            "nombre": player["nombre"],
+            "posicion": player["posicion"],
+            "posicion_label": POSITION_LABELS.get(player["posicion"], player["posicion"]),
+            "elemento": player["elemento"],
+            "arquetipo": player["arquetipo"] if player["arquetipo"] != "Unknown" else None,
+            "sprite_url": player["sprite_url"],
+            "juego": season_label_es(season_group_label(player["juego"])),
+            "stats": {
+                "Potencia": player["potencia"],
+                "Control": player["control"],
+                "Técnica": player["tecnica"],
+                "Presión": player["presion"],
+                "Físico": player["fisico"],
+                "Agilidad": player["agilidad"],
+                "Inteligencia": player["inteligencia"],
+            },
+            "total": player["total"],
+            "current_value_label": format_euros(current_value_points),
+            "total_points": sum(points_by_gw.values()) if points_by_gw else 0,
+            "points_history": [{"gameweek": gw, "points": points_by_gw[gw]} for gw in sorted(points_by_gw)],
+            "value_history": value_history,
+        }
     )
 
 

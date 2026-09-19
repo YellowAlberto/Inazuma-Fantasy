@@ -34,13 +34,43 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="alert alert-{{ category }}">{{ message }}</div>
+          <div class="alert alert-{{ category }}" data-alert>
+            <span>{{ message }}</span>
+            <button type="button" class="alert-close" aria-label="Cerrar" data-alert-close>&times;</button>
+          </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
     {% block content %}{% endblock %}
   </main>
+
+  <div class="modal-overlay player-detail-overlay" id="player-detail-modal" style="display:none;">
+    <div class="modal-box player-detail-box">
+      <button type="button" class="modal-close" id="player-detail-close" aria-label="Cerrar">×</button>
+      <div class="player-detail-loading" id="player-detail-loading">Cargando…</div>
+      <div class="player-detail-content" id="player-detail-content" style="display:none;">
+        <div class="player-detail-header">
+          <div class="player-detail-sprite-wrap" id="player-detail-sprite-wrap"></div>
+          <div>
+            <h2 id="player-detail-name"></h2>
+            <p class="muted" id="player-detail-meta"></p>
+            <p class="muted player-detail-value">Valor actual: <strong id="player-detail-value"></strong> · 🏆 <span id="player-detail-total-points"></span> pts hechos</p>
+          </div>
+        </div>
+
+        <h3 class="section-title-sm">Estadísticas</h3>
+        <div class="player-stat-bars" id="player-detail-stats"></div>
+
+        <h3 class="section-title-sm">Puntos por jornada</h3>
+        <div id="player-detail-points"></div>
+
+        <h3 class="section-title-sm">Evolución del valor de mercado</h3>
+        <div id="player-detail-value-chart"></div>
+      </div>
+    </div>
+  </div>
+  <script src="{{ url_for('static', filename='player-detail.js') }}" defer></script>
 
   <footer class="site-footer">
     <p class="muted">Creado por <strong>YellowAlberto</strong> con Claude.</p>
@@ -61,6 +91,45 @@
       toggle.addEventListener('click', function () {
         var open = links.classList.toggle('navbar-links-open');
         toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+
+    // Flash messages: close button + auto-dismiss after a few seconds
+    (function () {
+      function closeAlert(el) {
+        if (!el || el.classList.contains('alert-hide')) return;
+        el.classList.add('alert-hide');
+        el.addEventListener('animationend', function () { el.remove(); }, { once: true });
+      }
+      document.querySelectorAll('[data-alert]').forEach(function (el) {
+        var timer = setTimeout(function () { closeAlert(el); }, 6000);
+        var closeBtn = el.querySelector('[data-alert-close]');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function () {
+            clearTimeout(timer);
+            closeAlert(el);
+          });
+        }
+      });
+    })();
+
+    // Disable the submit button (with a spinner) once a form is actually submitted,
+    // so double-clicks (e.g. on a bid) don't send the request twice. Skipped if the
+    // submit gets cancelled by a confirm() dialog, and opt-out via data-no-loading.
+    (function () {
+      document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement) || form.hasAttribute('data-no-loading')) return;
+        setTimeout(function () {
+          if (e.defaultPrevented) return;
+          var buttons = form.querySelectorAll('button[type="submit"], button:not([type])');
+          buttons.forEach(function (btn) {
+            if (btn.disabled) return;
+            btn.disabled = true;
+            btn.classList.add('btn-loading');
+            btn.innerHTML = '<span class="btn-spinner"></span>' + (btn.dataset.loadingText || btn.textContent.trim());
+          });
+        }, 0);
       });
     })();
   </script>

@@ -56,9 +56,12 @@ h1, h2, h3 {
    with broken/mixed glyphs. */
 .brand-title {
   font-family: var(--font-title);
+  font-size: 1.7rem;
   letter-spacing: 0.02em;
   font-weight: 400;
 }
+/* The home hero title is in a wide, centered block, so it can go bigger without wrapping */
+.home-hero .brand-title { font-size: 2.6rem; }
 
 a { color: var(--blue-accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -197,6 +200,24 @@ a:hover { text-decoration: underline; }
 .btn-danger { background: transparent; color: var(--red); border: 1px solid var(--red); }
 .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--navy-600); }
 .btn-block { width: 100%; text-align: center; }
+
+.btn-loading { cursor: wait !important; opacity: 0.85; }
+.btn-spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin-right: 7px;
+  vertical-align: -2px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-top-color: rgba(0, 0, 0, 0.75);
+  border-radius: 50%;
+  animation: btn-spin 0.6s linear infinite;
+}
+.btn-secondary .btn-spinner, .btn-ghost .btn-spinner, .btn-danger .btn-spinner {
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: rgba(255, 255, 255, 0.85);
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
 
 /* Cards & layout ("cajitas") */
 .card {
@@ -698,13 +719,41 @@ a.card:hover, .league-card:hover {
 
 /* Alerts / flash messages */
 .alert, .alert-error, .alert-success {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 12px 16px;
   border-radius: 10px;
   margin-bottom: 16px;
   font-size: 0.9rem;
+  animation: alert-in 0.25s ease;
 }
 .alert-error { background: rgba(255, 77, 94, 0.15); border: 1px solid var(--red); color: #ffb3ba; }
 .alert-success { background: rgba(51, 192, 122, 0.15); border: 1px solid var(--green); color: #a4f0c6; }
+.alert-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.65;
+}
+.alert-close:hover { opacity: 1; }
+@keyframes alert-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.alert.alert-hide {
+  animation: alert-out 0.2s ease forwards;
+}
+@keyframes alert-out {
+  from { opacity: 1; max-height: 60px; margin-bottom: 16px; }
+  to { opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+}
 
 /* Leagues */
 .league-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; }
@@ -712,10 +761,32 @@ a.card:hover, .league-card:hover {
 .league-code { font-family: monospace; color: var(--orange); }
 .empty-state { color: var(--text-muted); grid-column: 1/-1; }
 
+.empty-box {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--text-muted);
+}
+.empty-box-icon {
+  font-size: 2.4rem;
+  margin-bottom: 10px;
+  opacity: 0.85;
+  filter: drop-shadow(0 0 10px rgba(255, 210, 63, 0.25));
+}
+.empty-box p { margin: 0 auto; max-width: 360px; }
+.empty-box-card { padding: 8px; }
+
 .tab-links { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 
 .simple-table { width: 100%; border-collapse: collapse; }
 .simple-table th, .simple-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--navy-600); }
+.simple-table thead th {
+  position: sticky;
+  top: 65px;
+  background: var(--navy-800);
+  z-index: 2;
+  box-shadow: 0 1px 0 var(--navy-600);
+}
 .standings-leader td { color: var(--orange); font-weight: 700; }
 
 /* Market filter bar */
@@ -751,6 +822,9 @@ a.card:hover, .league-card:hover {
   font-size: 2.5rem; color: var(--text-muted);
 }
 .player-card-body { padding: 8px 10px; flex-grow: 1; }
+.player-card-info { padding: 8px 10px 0; }
+.player-card-clickable { cursor: pointer; }
+.player-card-clickable:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
 .player-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-meta { font-size: 0.78rem; color: var(--text-muted); }
 .player-meta-small { font-size: 0.72rem; opacity: 0.8; }
@@ -760,6 +834,42 @@ a.card:hover, .league-card:hover {
   align-items: center; justify-content: center; min-height: 180px;
   border: 2px dashed var(--navy-600); color: var(--text-muted);
 }
+
+/* Hint shown above player grids that support the click-to-open popup */
+.player-detail-hint { margin-bottom: 12px; font-size: 0.85rem; }
+
+/* Player-detail popup (stats, points per jornada, value chart) */
+.player-detail-box { max-width: 460px; position: relative; }
+.modal-close {
+  position: absolute; top: 12px; right: 12px; width: 32px; height: 32px;
+  border-radius: 50%; border: 1px solid var(--navy-600); background: var(--navy-800);
+  color: var(--text-light); font-size: 1.1rem; line-height: 1; cursor: pointer;
+}
+.modal-close:hover { border-color: var(--orange); color: var(--orange); }
+.player-detail-loading { text-align: center; padding: 24px; color: var(--text-muted); }
+.player-detail-header { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; padding-right: 30px; }
+.player-detail-sprite, .player-detail-sprite-placeholder {
+  width: 72px; height: 72px; object-fit: contain; image-rendering: pixelated;
+  background: var(--navy-900); border-radius: 12px; flex-shrink: 0;
+}
+.player-detail-sprite-placeholder { display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: var(--text-muted); }
+.player-detail-header h2 { margin: 0 0 2px; font-size: 1.2rem; }
+.player-detail-value strong { color: var(--orange); }
+.section-title-sm { margin: 18px 0 8px; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+.player-stat-bars { display: flex; flex-direction: column; gap: 6px; }
+.stat-bar-row { display: grid; grid-template-columns: 90px 1fr 34px; align-items: center; gap: 8px; font-size: 0.78rem; }
+.stat-bar-label { color: var(--text-muted); }
+.stat-bar-track { height: 8px; border-radius: 6px; background: var(--navy-900); overflow: hidden; }
+.stat-bar-fill { height: 100%; background: linear-gradient(90deg, var(--blue-accent), var(--yellow)); border-radius: 6px; }
+.stat-bar-value { text-align: right; font-weight: 600; }
+
+.player-points-table { font-size: 0.82rem; }
+.player-points-table th, .player-points-table td { padding: 4px 8px; }
+
+.value-chart-wrap { background: var(--navy-900); border-radius: 10px; padding: 8px; }
+.value-chart-svg { width: 100%; height: 90px; display: block; }
+.value-chart-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
 
 .pagination { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
 
