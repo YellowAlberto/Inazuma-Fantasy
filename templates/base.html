@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Inazuma Fantasy{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
@@ -12,7 +13,8 @@
   <header class="navbar">
     <a href="{{ url_for('index') }}" class="navbar-brand">⚡ Inazuma Fantasy</a>
     {% if current_user.id %}
-    <nav class="navbar-links">
+    <button type="button" class="navbar-toggle" id="navbarToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navbarLinks">☰</button>
+    <nav class="navbar-links" id="navbarLinks">
       <a href="{{ url_for('leagues') }}">Mis ligas</a>
       {% if current_user.is_admin %}<a href="{{ url_for('admin_leagues') }}">🛠️ Admin</a>{% endif %}
       <a href="{{ url_for('profile') }}" class="navbar-user">
@@ -39,5 +41,28 @@
 
     {% block content %}{% endblock %}
   </main>
+
+  <footer class="site-footer">
+    <p class="muted">Creado por <strong>YellowAlberto</strong> con Claude.</p>
+    <p class="muted">¿Dudas o has encontrado algún error? Puedes contactarme por aquí:</p>
+    <div class="home-social-links">
+      <a href="https://x.com/YellowAlberto" target="_blank" rel="noopener">🐦 X / Twitter</a>
+      <span class="home-social-item">💬 Discord: <strong>YellowAlberto</strong></span>
+      <a href="https://github.com/YellowAlberto/Inazuma-Fantasy" target="_blank" rel="noopener">💻 GitHub</a>
+    </div>
+    <p class="font-credit">Fonts made from <a href="https://www.onlinewebfonts.com" target="_blank" rel="noopener">Web Fonts</a> is licensed by CC BY 4.0</p>
+  </footer>
+
+  <script>
+    (function () {
+      var toggle = document.getElementById('navbarToggle');
+      var links = document.getElementById('navbarLinks');
+      if (!toggle || !links) return;
+      toggle.addEventListener('click', function () {
+        var open = links.classList.toggle('navbar-links-open');
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -78,6 +78,18 @@ STARTER_FORMATION = [("GK", 1), ("DF", 4), ("MF", 4), ("FW", 2)]
 MARKET_POSITION_COUNTS = {"GK": 2, "DF": 8, "MF": 8, "FW": 4}
 MARKET_SIZE = sum(MARKET_POSITION_COUNTS.values())
 
+# Every league gets its own fixed pool of players at creation time, and the
+# weekly market only ever draws from that pool (rotating through it,
+# shrinking as players get bought) instead of the whole database. This is
+# what creates real scarcity: with the entire database up for grabs, there's
+# always "one more" fresh batch next week, so nobody feels pressure to bid
+# on anyone. A bounded pool means a coveted player who slips away might not
+# come back, and eventually the pool itself runs low, forcing decisions.
+# Sized as "enough distinct players for ~N weeks of full rotation before
+# repeats start", proportioned the same way as the weekly market itself.
+POOL_ROTATION_WEEKS = 8
+POOL_POSITION_COUNTS = {pos: count * POOL_ROTATION_WEEKS for pos, count in MARKET_POSITION_COUNTS.items()}
+
 POSITION_LABELS = {"GK": "Portero", "DF": "Defensa", "MF": "Centrocampista", "FW": "Delantero"}
 
 # Player prices/budgets are a plain point currency (no "millions" unit).
@@ -450,7 +462,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             side["last_passer"] = attacker
             # Afinidad: sharp team chemistry turns some routine passes into
             # genuine chances on their own.
-            if "Afinidad" in side["affinities"] and random.random() < 0.35:
+            if "Afinidad" in side["affinities"] and random.random() < 0.35 * affinity_scale(side["affinities"]["Afinidad"]):
                 log = side["logs"][attacker["id"]]
                 log.key_passes += 1
                 if log.key_passes <= KEY_PASS_POINTS_CAP:
@@ -536,7 +548,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     # Juego Sucio: a more aggressive, no-nonsense press wins the
                     # ball back more often.
                     if "Juego Sucio" in other["affinities"]:
-                        defend_skill += 0.15
+                        defend_skill += 0.15 * affinity_scale(other["affinities"]["Juego Sucio"])
                     if defend_skill + random.uniform(0, 0.35) > attack_skill:
                         log = other["logs"][defender["id"]]
                         log.steals += 1
@@ -549,7 +561,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                                 f"🛡️ Robo de balón de {defender['nombre']} ({other['label']})",
                                 {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
                             ))
-                    elif "Brecha" in other["affinities"] and random.random() < 0.35:
+                    elif "Brecha" in other["affinities"] and random.random() < 0.35 * affinity_scale(other["affinities"]["Brecha"]):
                         # Brecha: even when the tackle itself fails, a sharp
                         # defensive read cleans up the danger anyway.
                         log = other["logs"][defender["id"]]
@@ -696,16 +708,16 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 
             # Justicia: a well-organized defensive block is harder to break down.
             if "Justicia" in other["affinities"]:
-                goal_chance -= 0.07
+                goal_chance -= 0.07 * affinity_scale(other["affinities"]["Justicia"])
             # Contraataque: clinical when soaking up pressure and hitting on
             # the break, i.e. when this side doesn't dominate possession.
             if "Contraataque" in side["affinities"]:
                 side_possession = home_possession_prob if side_key == "home" else (1 - home_possession_prob)
                 if side_possession < 0.5:
-                    goal_chance += 0.08
+                    goal_chance += 0.08 * affinity_scale(side["affinities"]["Contraataque"])
             # Tensión: thrives under pressure in the closing stages.
             if "Tensión" in side["affinities"] and minute >= 70:
-                goal_chance += 0.08
+                goal_chance += 0.08 * affinity_scale(side["affinities"]["Tensión"])
 
             # Cautious opening exchanges: both sides feel each other out
             # before really committing to chances.
@@ -904,15 +916,35 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 # several characters who share the same in-game personality archetype
 # (Justicia, Contraataque, Tensión...), not just raw stats.
 # ---------------------------------------------------------------------------
-AFFINITY_THRESHOLDS = [(6, 2), (4, 1)]  # (min players sharing it, bonus points)
+AFFINITY_THRESHOLDS = [(8, 3), (6, 2), (4, 1)]  # (min players sharing it, bonus points)
 MATCH_AFFINITY_THRESHOLD = 4  # players needed for a live in-match effect to kick in
+
+# Once an affinity is active (>=4 sharing players), its in-match effect keeps
+# growing a little with every extra player sharing it, instead of being a
+# flat on/off switch -- but capped well below "excessive" so a stacked
+# lineup is meaningfully better, not game-breaking.
+AFFINITY_SCALE_PER_EXTRA_PLAYER = 0.08
+AFFINITY_SCALE_CAP = 1.5
+
+
+def affinity_scale(count):
+    """Multiplier applied to an active affinity's effect size, based on how
+    many players in the lineup share that archetype. 1.0x right at the
+    threshold (4 players), growing modestly per extra player, capped at
+    AFFINITY_SCALE_CAP so it's never excessive."""
+    if count is None or count < MATCH_AFFINITY_THRESHOLD:
+        return 0.0
+    extra = count - MATCH_AFFINITY_THRESHOLD
+    return min(AFFINITY_SCALE_CAP, 1.0 + extra * AFFINITY_SCALE_PER_EXTRA_PLAYER)
 
 
 def active_match_affinities(lineup):
-    """Which archetypes have enough players (>=4) in this lineup for their
-    in-match gameplay effect (see simulate_fixture) to actually kick in."""
+    """Archetypes with enough players (>=4) in this lineup for their in-match
+    gameplay effect (see simulate_fixture) to kick in, mapped to how many
+    players share them -- used both as a membership check ("X" in ...) and
+    to scale each effect's magnitude via affinity_scale(count)."""
     counts = Counter(p["arquetipo"] for p in lineup if p.get("arquetipo") and p["arquetipo"] != "Unknown")
-    return {arquetipo for arquetipo, count in counts.items() if count >= MATCH_AFFINITY_THRESHOLD}
+    return {arquetipo: count for arquetipo, count in counts.items() if count >= MATCH_AFFINITY_THRESHOLD}
 
 
 def compute_affinity_bonuses(lineup):
@@ -1082,9 +1114,50 @@ def generate_balanced_roster(db, budget, seasons=None, exclude_ids=None, scout_f
     return picked_ids
 
 
-def generate_weekly_market(db, seasons=None, exclude_ids=None, scout_filter=None):
+def generate_league_pool(db, seasons=None, scout_filter=None):
+    """Picks a league's fixed player pool at creation time: POOL_POSITION_COUNTS
+    players per position (proportioned like the weekly market, just bigger),
+    respecting the league's season/scout settings. This is the closed universe
+    the weekly market will keep drawing from and rotating through for the
+    life of the league."""
+    picked_ids = []
+
+    season_where = ""
+    season_params = []
+    if seasons:
+        placeholders = ",".join("?" for _ in seasons)
+        season_where = f"AND juego IN ({placeholders})"
+        season_params = list(seasons)
+
+    scout_where = _scout_filter_sql(scout_filter)
+
+    for pos, count in POOL_POSITION_COUNTS.items():
+        exclude_sql = ""
+        exclude_params = []
+        if picked_ids:
+            exclude_sql = f"AND id NOT IN ({','.join('?' for _ in picked_ids)})"
+            exclude_params = list(picked_ids)
+
+        rows = db.execute(
+            f"""
+            SELECT id FROM players
+            WHERE posicion = ? {season_where} {scout_where} {exclude_sql}
+            ORDER BY RANDOM()
+            LIMIT ?
+            """,
+            [pos] + season_params + exclude_params + [count],
+        ).fetchall()
+        picked_ids.extend(r["id"] for r in rows)
+
+    return picked_ids
+
+
+def generate_weekly_market(db, seasons=None, exclude_ids=None, scout_filter=None, pool_ids=None):
     """Picks a fresh weekly market of MARKET_SIZE (22) players, proportioned
-    across positions, excluding anyone already owned in the league."""
+    across positions, excluding anyone already owned in the league. When
+    pool_ids is given, only draws from that fixed set (the league's pool)
+    instead of the whole players table — that's what makes the market a
+    closed, rotating, eventually-depleting set rather than infinite variety."""
     exclude_ids = set(exclude_ids or [])
     picked_ids = []
 
@@ -1097,6 +1170,12 @@ def generate_weekly_market(db, seasons=None, exclude_ids=None, scout_filter=None
 
     scout_where = _scout_filter_sql(scout_filter)
 
+    pool_where = ""
+    pool_params = []
+    if pool_ids:
+        pool_where = f"AND id IN ({','.join('?' for _ in pool_ids)})"
+        pool_params = list(pool_ids)
+
     for pos, count in MARKET_POSITION_COUNTS.items():
         all_excluded = exclude_ids | set(picked_ids)
         exclude_sql = ""
@@ -1108,11 +1187,11 @@ def generate_weekly_market(db, seasons=None, exclude_ids=None, scout_filter=None
         rows = db.execute(
             f"""
             SELECT id FROM players
-            WHERE posicion = ? {season_where} {scout_where} {exclude_sql}
+            WHERE posicion = ? {season_where} {scout_where} {pool_where} {exclude_sql}
             ORDER BY RANDOM()
             LIMIT ?
             """,
-            [pos] + season_params + exclude_params + [count],
+            [pos] + season_params + pool_params + exclude_params + [count],
         ).fetchall()
         picked_ids.extend(r["id"] for r in rows)
 

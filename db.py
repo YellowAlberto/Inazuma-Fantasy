@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from scoring import compute_price_from_form_index
+from scoring import compute_price_from_form_index, generate_league_pool
 
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "inazuma_fantasy.sqlite"
@@ -95,6 +95,21 @@ CREATE TABLE IF NOT EXISTS league_market (
     league_id INTEGER NOT NULL,
     player_id INTEGER NOT NULL,
     released_by_user_id INTEGER,
+    UNIQUE(league_id, player_id)
+);
+
+CREATE TABLE IF NOT EXISTS league_player_pool (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
+    UNIQUE(league_id, player_id)
+);
+
+CREATE TABLE IF NOT EXISTS market_simulated_points (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    player_id INTEGER NOT NULL,
+    points INTEGER NOT NULL DEFAULT 0,
     UNIQUE(league_id, player_id)
 );
 
@@ -309,6 +324,7 @@ def _run_migrations(conn):
     _resync_expanded_techniques_from_seed(conn)
     _backfill_scout_flags_from_seed(conn)
     _backfill_victory_road_club_scout_fix(conn)
+    _backfill_league_pools(conn)
 
     # Fix sprite paths from an earlier version that pointed at /sprites/...
     # instead of Flask's actual static route /static/sprites/...
@@ -471,6 +487,27 @@ def _backfill_victory_road_club_scout_fix(conn):
     for p in seed_players:
         if p.get("juego") == "Inazuma Eleven: Victory Road" and p.get("es_scout"):
             conn.execute("UPDATE players SET es_scout = 1 WHERE id = ?", (p["id"],))
+
+
+def _backfill_league_pools(conn):
+    """Every league needs a fixed player pool for its weekly market to draw
+    from (see generate_league_pool). Leagues created before this feature
+    existed don't have one yet -- generate one now for each of them, using
+    the same season/scout settings they were created with, so old leagues
+    get the same rotating-pool scarcity going forward without losing any
+    existing data."""
+    leagues = conn.execute(
+        "SELECT id, seasons, scout_filter FROM leagues "
+        "WHERE id NOT IN (SELECT DISTINCT league_id FROM league_player_pool)"
+    ).fetchall()
+    for league in leagues:
+        seasons_raw = (league["seasons"] or "").strip()
+        seasons = [s for s in seasons_raw.split("|") if s] if seasons_raw else None
+        pool_ids = generate_league_pool(conn, seasons=seasons, scout_filter=league["scout_filter"])
+        conn.executemany(
+            "INSERT OR IGNORE INTO league_player_pool (league_id, player_id) VALUES (?, ?)",
+            [(league["id"], pid) for pid in pool_ids],
+        )
 
 
 def _rescale_to_points_system(conn):

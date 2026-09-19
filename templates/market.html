@@ -73,7 +73,7 @@
       <input type="hidden" name="posicion" value="{{ posicion }}">
       <input type="hidden" name="arquetipo" value="{{ arquetipo }}">
       <input type="hidden" name="sort" value="{{ sort }}">
-      <input type="number" step="0.1" min="{{ p.min_bid|euromillions }}" name="amount" placeholder="Mín. {{ p.min_bid|euromillions }}M €" value="{{ p.my_bid|euromillions if p.my_bid else '' }}" required>
+      <input type="number" step="0.1" min="{{ p.min_bid|euromillions }}" name="amount" placeholder="Mín. {{ p.min_bid|euromillions }}M €" value="{{ p.my_bid|euromillions if p.my_bid else p.min_bid|euromillions }}" required>
       <button class="btn btn-primary btn-block" type="submit">{{ 'Actualizar puja' if p.my_bid else 'Pujar' }}</button>
     </form>
     {% if p.my_bid %}

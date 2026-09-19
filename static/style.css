@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Reggae';
+  src: url('fonts/reggae-by-aslam.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Blue base tones (replaces the old plain navy) */
   --navy-900: #060c22;
@@ -16,6 +24,7 @@
   --text-light: #fbf6e8;
   --text-muted: #9fabd6;
   --font-head: 'Rubik', sans-serif;
+  --font-title: 'Reggae', 'Rubik', sans-serif;
   --font-body: 'Inter', sans-serif;
 }
 
@@ -41,6 +50,15 @@ h1, h2, h3 {
   font-family: var(--font-head);
   margin: 0 0 8px;
 }
+/* The Reggae display font has no á/é/í/ó/ú/ñ/¿/¡ glyphs, so it's only safe on the
+   static "Inazuma Fantasy" brand title (no accents) — not on h1/h2 in general,
+   since most of those are Spanish text or user-entered names and would render
+   with broken/mixed glyphs. */
+.brand-title {
+  font-family: var(--font-title);
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
 
 a { color: var(--blue-accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -62,14 +80,43 @@ a:hover { text-decoration: underline; }
   backdrop-filter: blur(6px);
 }
 .navbar-brand {
-  font-family: var(--font-head);
-  font-weight: 900;
-  font-size: 1.3rem;
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 1.5rem;
+  letter-spacing: 0.03em;
   color: var(--yellow) !important;
   text-decoration: none !important;
   text-shadow: 0 0 14px rgba(255, 210, 63, 0.35);
 }
 .navbar-links { display: flex; align-items: center; gap: 18px; }
+.navbar-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--navy-600);
+  color: var(--text-light);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 6px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.navbar-toggle:hover { border-color: var(--orange); color: var(--orange); }
+@media (max-width: 700px) {
+  .navbar { flex-wrap: wrap; }
+  .navbar-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .navbar-links {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--navy-600);
+  }
+  .navbar-links.navbar-links-open { display: flex; }
+  .navbar-links .btn { width: 100%; text-align: center; }
+}
 .navbar-user { color: var(--text-muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .navbar-user:hover { color: var(--text-light); }
 .navbar-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); }
@@ -153,6 +200,7 @@ a:hover { text-decoration: underline; }
 
 /* Cards & layout ("cajitas") */
 .card {
+  position: relative;
   background: linear-gradient(165deg, var(--navy-700) 0%, var(--navy-800) 100%);
   border: 1px solid var(--navy-600);
   border-top: 2px solid rgba(255, 210, 63, 0.5);
@@ -167,6 +215,35 @@ a:hover { text-decoration: underline; }
 a.card:hover, .league-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3), 0 14px 28px rgba(4, 8, 24, 0.5);
+}
+
+/* Inazuma bolt flourish on hover, top-left and bottom-right corners */
+.card::before, .card::after,
+.modal-box::before, .modal-box::after {
+  content: "⚡";
+  position: absolute;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--yellow);
+  filter: drop-shadow(0 0 6px rgba(255, 210, 63, 0.9)) drop-shadow(0 0 12px rgba(255, 122, 26, 0.6));
+  opacity: 0;
+  transform: scale(0.4) rotate(-18deg);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 5;
+}
+.card::before, .modal-box::before { top: -12px; left: -12px; }
+.card::after, .modal-box::after {
+  bottom: -12px; right: -12px;
+  transform: scale(0.4) rotate(162deg);
+}
+.card:hover::before {
+  opacity: 1;
+  transform: scale(1) rotate(-18deg);
+}
+.card:hover::after {
+  opacity: 1;
+  transform: scale(1) rotate(162deg);
 }
 .page-header {
   display: flex;
@@ -762,11 +839,17 @@ a.card:hover, .league-card:hover {
 .home-feature { display: flex; gap: 14px; align-items: flex-start; }
 .home-feature-icon { font-size: 1.8rem; line-height: 1; }
 .home-feature h3 { margin: 0 0 6px; font-size: 1rem; }
-.home-footer {
+.home-footer,
+.site-footer {
   text-align: center;
   margin: 40px 0 16px;
   padding-top: 20px;
   border-top: 1px solid var(--navy-600);
+}
+.site-footer {
+  max-width: 1200px;
+  margin: 40px auto 16px;
+  padding: 20px 32px 0;
 }
 .home-social-links {
   display: flex;
@@ -785,6 +868,14 @@ a.card:hover, .league-card:hover {
 }
 .home-social-links a:hover { color: var(--orange); }
 .home-social-links strong { color: var(--text-light); }
+.font-credit {
+  margin-top: 18px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+.font-credit a { color: var(--text-muted); text-decoration: underline; }
+.font-credit a:hover { color: var(--orange); }
 
 /* New-squad popup */
 .modal-overlay {

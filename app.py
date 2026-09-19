@@ -29,6 +29,7 @@ from scoring import (
     count_missing_slots,
     formation_requirements,
     generate_balanced_roster,
+    generate_league_pool,
     generate_weekly_market,
     missing_positions_message,
     season_group_label,
@@ -408,13 +409,40 @@ def compute_match_pitch_positions(lineup_data, side):
     return positions
 
 
+def ensure_league_pool(db, league):
+    """Every league has a fixed pool of players (generated once, at creation
+    time) that its weekly market rotates through. Generates it now if it
+    doesn't exist yet (brand new league, or an older league upgraded by a
+    migration that somehow missed it) and returns the pool's player ids."""
+    pool_ids = [
+        r["player_id"]
+        for r in db.execute("SELECT player_id FROM league_player_pool WHERE league_id = ?", (league["id"],)).fetchall()
+    ]
+    if pool_ids:
+        return pool_ids
+
+    seasons = league_seasons_list(league)
+    pool_ids = generate_league_pool(db, seasons=seasons, scout_filter=league["scout_filter"])
+    for pid in pool_ids:
+        db.execute(
+            "INSERT OR IGNORE INTO league_player_pool (league_id, player_id) VALUES (?, ?)",
+            (league["id"], pid),
+        )
+    return pool_ids
+
+
 def refresh_league_market(db, league):
     """Clears and regenerates a league's weekly market, excluding anyone
-    already owned by a member, and seeds/keeps market values."""
+    already owned by a member, and seeds/keeps market values. Only ever
+    draws from the league's own fixed player pool (see ensure_league_pool),
+    so the market is a closed, rotating set rather than infinite variety."""
     db.execute("DELETE FROM league_market WHERE league_id = ?", (league["id"],))
     exclude = owned_player_ids(db, league["id"])
     seasons = league_seasons_list(league)
-    new_ids = generate_weekly_market(db, seasons=seasons, exclude_ids=exclude, scout_filter=league["scout_filter"])
+    pool_ids = ensure_league_pool(db, league)
+    new_ids = generate_weekly_market(
+        db, seasons=seasons, exclude_ids=exclude, scout_filter=league["scout_filter"], pool_ids=pool_ids
+    )
     for pid in new_ids:
         db.execute(
             "INSERT OR IGNORE INTO league_market (league_id, player_id) VALUES (?, ?)",
@@ -430,6 +458,10 @@ def refresh_league_market(db, league):
                 "INSERT INTO league_player_value (league_id, player_id, value) VALUES (?, ?, ?)",
                 (league["id"], pid, base_price),
             )
+    # Give the freshly-listed market a simulated performance right away, so
+    # players show plausible "puntos hechos" from the moment they appear
+    # instead of sitting at 0 until the league's first real jornada.
+    simulate_points_for_market_pool(db, league["id"])
 
 
 def latest_gameweek_id(db, league_id):
@@ -445,7 +477,15 @@ def latest_gameweek_id(db, league_id):
 def simulate_points_for_market_pool(db, league_id):
     """Gives every player currently sitting unclaimed in the market a
     simulated performance, so their value/"puntos hechos" keeps moving even
-    if nobody in the league owns them yet."""
+    if nobody in the league owns them yet -- and so they show a plausible
+    points total (as if they'd played some gameweek) from the moment they
+    first appear, not just after the league's first real jornada.
+
+    That running total lives in market_simulated_points, independent of the
+    real gameweeks table, since a market rotation isn't a real match day and
+    a brand new league doesn't have any gameweeks yet. When a real gameweek
+    *does* exist, the same points are also filed under it (as before) so
+    older per-gameweek views keep working."""
     gw_id = latest_gameweek_id(db, league_id)
     pool_players = rows_to_list(
         db.execute(
@@ -455,6 +495,13 @@ def simulate_points_for_market_pool(db, league_id):
     )
     for p in pool_players:
         pts = simulate_market_player_points(p)
+        db.execute(
+            """
+            INSERT INTO market_simulated_points (league_id, player_id, points) VALUES (?, ?, ?)
+            ON CONFLICT(league_id, player_id) DO UPDATE SET points = points + excluded.points
+            """,
+            (league_id, p["id"], pts),
+        )
         if gw_id is not None:
             db.execute(
                 "INSERT INTO gameweek_scores (gameweek_id, league_id, user_id, player_id, points, events) "
@@ -522,8 +569,7 @@ def rotate_market_for_league(db, league_id):
     db.execute("DELETE FROM league_market WHERE league_id = ?", (league_id,))
 
     league = row_to_dict(db.execute("SELECT * FROM leagues WHERE id = ?", (league_id,)).fetchone())
-    refresh_league_market(db, league)
-    simulate_points_for_market_pool(db, league_id)
+    refresh_league_market(db, league)  # this also simulates points for the fresh listing
     db.commit()
 
 
@@ -1416,14 +1462,14 @@ def market(league_id):
             f"""
             SELECT p.*, lm.released_by_user_id, lpv.value as market_value,
                    seller.team_name as seller_team_name,
-                   COALESCE((SELECT SUM(gs.points) FROM gameweek_scores gs
-                             WHERE gs.league_id = lm.league_id AND gs.player_id = p.id), 0) as total_points,
+                   COALESCE(msp.points, 0) as total_points,
                    EXISTS(SELECT 1 FROM bids cb WHERE cb.league_id = lm.league_id AND cb.player_id = p.id
                           AND cb.user_id = ?) as has_cpu_offer
             FROM league_market lm
             JOIN players p ON p.id = lm.player_id
             LEFT JOIN league_player_value lpv ON lpv.league_id = lm.league_id AND lpv.player_id = lm.player_id
             LEFT JOIN league_members seller ON seller.league_id = lm.league_id AND seller.user_id = lm.released_by_user_id
+            LEFT JOIN market_simulated_points msp ON msp.league_id = lm.league_id AND msp.player_id = lm.player_id
             WHERE {where_sql}
             ORDER BY {order_by}
             """,
