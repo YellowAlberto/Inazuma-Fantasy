@@ -124,7 +124,7 @@ def formation_requirements(formation_key):
 # ---------------------------------------------------------------------------
 APPEARANCE_POINTS = 2
 ASSIST_POINTS = 3
-GOAL_POINTS = {"GK": 10, "DF": 7, "MF": 6, "FW": 5}
+GOAL_POINTS = {"GK": 6, "DF": 6, "MF": 5, "FW": 4}  # same scale LaLiga Fantasy MARCA uses
 CLEAN_SHEET_POINTS = {"GK": 3, "DF": 3, "MF": 2, "FW": 1}
 SAVE_POINTS = 1
 STEAL_POINTS = 1

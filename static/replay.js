@@ -408,13 +408,17 @@ document.addEventListener('DOMContentLoaded', function () {
         lastBallY = y;
         moveBadgeTo(badge, x, y);
         placeBall(x, y);
-        if (ev.type === 'goal') {
+        if (ev.type === 'goal' || ev.type === 'shot_off') {
           // The shooter stays put after striking it — only the ball
-          // keeps traveling, the rest of the way into the actual net,
-          // arriving a beat later than the player themselves.
+          // keeps traveling, arriving a beat later than the player
+          // themselves. A goal lands in the net at the shooter's own
+          // height; a shot_off keeps going past the byline outside the
+          // goal frame (the goal mouth spans roughly y 32%-68%), reading
+          // as a shot that flew wide or over the bar instead of in.
           var goalX = ev.side === 'home' ? 97 : 3;
+          var goalY = ev.type === 'goal' ? y : (Math.random() < 0.5 ? 12 : 88);
           setTimeout(function () {
-            placeBall(goalX, y);
+            placeBall(goalX, goalY);
           }, 600);
         }
         badge.classList.remove('pitch-mini-player-glow', 'pitch-mini-player-glow-goal');
@@ -482,15 +486,60 @@ document.addEventListener('DOMContentLoaded', function () {
         caption.textContent = text;
       }
 
-      if (ev.type === 'goal') {
-        // Let the ball actually travel all the way to the net first — the
-        // shooter moves into position (0.6s), then the ball alone
-        // continues on into the goal (another 0.6s) — the flash, sound,
-        // score and caption all land right as it crosses the line.
+      if (ev.type === 'goal' || ev.type === 'shot_off') {
+        // Let the ball actually travel all the way to the net (or wide of
+        // it) first — the shooter moves into position (0.6s), then the
+        // ball alone continues on its own (another 0.6s) — the flash,
+        // sound and caption all land right as it crosses the line.
         setTimeout(applyGoalEffectsAndCaption, 1200);
       } else {
         applyGoalEffectsAndCaption();
       }
+    }
+
+    function gkBadgeFor(sideKey) {
+      for (var i = 0; i < badges.length; i++) {
+        if (badges[i].dataset.side === sideKey && badges[i].dataset.position === 'GK') return badges[i];
+      }
+      return null;
+    }
+
+    // After a shot flies wide, the defending goalkeeper jogs over, collects
+    // the ball from behind their own goal line and puts it back into play
+    // with a goal kick out toward midfield — purely a cosmetic beat (no
+    // backend event needed, the defending side is just the shooter's
+    // opponent), before the replay moves on to the next event.
+    function performGoalKick(attackingSide, callback) {
+      var defendingSide = attackingSide === 'home' ? 'away' : 'home';
+      var gk = gkBadgeFor(defendingSide);
+      if (!gk) { callback(); return; }
+
+      var gkX = parseFloat(gk.dataset.x);
+      var gkY = parseFloat(gk.dataset.y);
+      placeBall(gkX, gkY);
+      lastBallX = gkX; lastBallY = gkY;
+      gk.classList.remove('pitch-mini-player-glow', 'pitch-mini-player-glow-goal');
+      void gk.offsetWidth; // force reflow so the glow can restart
+      gk.classList.add('pitch-mini-player-glow');
+
+      var gkName = gk.getAttribute('title') || '';
+      var teamLabel = defendingSide === 'home' ? homeLabel : awayLabel;
+      caption.textContent = '🥅 Saque de portería — ' + gkName + ' (' + teamLabel + ')';
+      playSoundFor('clearance');
+
+      timer = setTimeout(function () {
+        // The keeper punts it back out into play.
+        var outX = defendingSide === 'home' ? clampPct(35 + Math.random() * 15) : clampPct(50 + Math.random() * 15);
+        var outY = clampPct(50 + (Math.random() * 30 - 15));
+        placeBall(outX, outY);
+        lastBallX = outX; lastBallY = outY;
+        timer = setTimeout(function () {
+          sendBadgeHome(gk);
+          resetAllBadges();
+          placeBall(50, 50); lastBallX = 50; lastBallY = 50;
+          callback();
+        }, 500);
+      }, 500);
     }
 
     function step() {
@@ -523,6 +572,16 @@ document.addEventListener('DOMContentLoaded', function () {
             resetAllBadges();
             placeBall(50, 50); lastBallX = 50; lastBallY = 50;
             timer = setTimeout(step, 950);
+          }, 1800);
+        } else if (ev.type === 'shot_off') {
+          // Same pacing as a goal: the ball travels out over 1200ms, the
+          // "¡Disparo fuera!" caption lands and stays up for a beat (same
+          // 600ms window a goal celebration gets) before the defending
+          // goalkeeper jogs over for the goal kick.
+          timer = setTimeout(function () {
+            performGoalKick(ev.side, function () {
+              timer = setTimeout(step, 700);
+            });
           }, 1800);
         } else {
           timer = setTimeout(step, 950);
