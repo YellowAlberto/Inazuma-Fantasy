@@ -210,6 +210,35 @@ def _pick_weighted(players, weight_fn):
     return random.choices(players, weights=weights, k=1)[0]
 
 
+# How much more likely the player who's actually known to have the ball
+# right now (side["possessor_id"] — set by the previous pass/steal/
+# interception/dribble that this same side just won or kept) is to be the
+# protagonist of the side's next action, versus a fully independent
+# stat-weighted pick across everyone nearby. Not a hard lock — real
+# possession involves lots of short, unlogged link-up passes, so someone
+# else nearby can still end up with it — but it stops the log from
+# narrating "X steals it" followed by an unrelated "Y shoots" with no
+# visible connection between the two.
+POSSESSION_CONTINUITY_BOOST = 8.0
+
+
+def _pick_weighted_biased(players, weight_fn, favored_id):
+    """Like _pick_weighted, but multiplies the favored player's weight (the
+    side's current ball possessor, if they're in the pool) so the next
+    logged action is usually — but not always — carried out by whoever we
+    last showed gaining or keeping the ball."""
+    if favored_id is None:
+        return _pick_weighted(players, weight_fn)
+
+    def _weight(p):
+        w = weight_fn(p)
+        if p["id"] == favored_id:
+            w *= POSSESSION_CONTINUITY_BOOST
+        return w
+
+    return _pick_weighted(players, _weight)
+
+
 def _compute_lineup_y_positions(lineup):
     """Assigns each player a rough lateral pitch position (0-100, same idea
     as the y-coordinate used to lay them out on the visual pitch) based on
@@ -357,6 +386,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             "y_positions": _compute_lineup_y_positions(home_lineup),
             "marking": MarkingMemory() if use_marking_memory else None,
             "primed_receiver_id": None,
+            "possessor_id": None,
         },
         "away": {
             "lineup": away_lineup,
@@ -370,6 +400,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             "y_positions": _compute_lineup_y_positions(away_lineup),
             "marking": MarkingMemory() if use_marking_memory else None,
             "primed_receiver_id": None,
+            "possessor_id": None,
         },
     }
 
@@ -443,11 +474,12 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 position_factor = {"FW": 1.6, "MF": 0.75, "DF": 0.18}.get(p["posicion"], 1.0)
                 return base * position_factor
 
-            attacker = _pick_weighted(attackers, _shot_weight)
+            attacker = _pick_weighted_biased(attackers, _shot_weight, side["possessor_id"])
         else:
-            attacker = _pick_weighted(
+            attacker = _pick_weighted_biased(
                 attackers,
                 lambda p: _normalize_stat(p["potencia"]) + _normalize_stat(p["tecnica"]) + _normalize_stat(p["control"]),
+                side["possessor_id"],
             )
 
         # The ball is now with whoever we just picked as the protagonist of
@@ -471,6 +503,10 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 )
                 ball_y = side["y_positions"].get(recipient["id"], ball_y)
             # else: keeps it themselves — the ball stays right where they are.
+
+            # Whoever ends up with the ball after this buildup play is who
+            # the side's next logged action should usually revolve around.
+            side["possessor_id"] = recipient["id"] if recipient is not None else attacker["id"]
 
             side["last_passer"] = attacker
             # Afinidad: sharp team chemistry turns some routine passes into
@@ -499,9 +535,10 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             # boosted chance to score IF their team's very next play is
             # them taking a shot.
             passer_pool = [p for p in attackers if p["posicion"] in ("MF", "FW")] or attackers
-            passer = _pick_weighted(
+            passer = _pick_weighted_biased(
                 passer_pool,
                 lambda p: _normalize_stat(p["control"]) + _normalize_stat(p["tecnica"]),
+                side["possessor_id"],
             )
             passer_y = side["y_positions"].get(passer["id"], 50)
             recipient_pool = [p for p in attackers if p["id"] != passer["id"]] or [passer]
@@ -513,6 +550,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             log.key_passes += 1
             side["last_passer"] = passer
             side["primed_receiver_id"] = recipient["id"]
+            side["possessor_id"] = recipient["id"]
             ball_y = side["y_positions"].get(recipient["id"], ball_y)
             if log.key_passes <= KEY_PASS_POINTS_CAP:
                 timeline.append((
@@ -523,6 +561,9 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 
         elif roll < 0.60:
             # A defender/midfielder from the other side tries a tackle.
+            # Assume the attacker rides the challenge out and keeps the ball
+            # unless one of the branches below says otherwise.
+            side["possessor_id"] = attacker["id"]
             defenders_pool = _nearby_pool(
                 [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"],
                 ball_y,
@@ -554,6 +595,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     side["logs"][attacker["id"]].losses += 1
                     shift_momentum(other_key)
                     ball_y = other["y_positions"].get(defender["id"], ball_y)
+                    side["possessor_id"] = None
+                    other["possessor_id"] = defender["id"]
                     if log.steals <= STEAL_POINTS_CAP:
                         timeline.append((
                             minute,
@@ -563,6 +606,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 elif attacker_technique:
                     # Guaranteed dribble: the attacker keeps the ball with flair.
                     side["last_passer"] = attacker
+                    side["possessor_id"] = attacker["id"]
                     timeline.append((
                         minute,
                         f"✨ ¡SÚPER TÉCNICA! {attacker['nombre']} regatea a {defender['nombre']} con {attacker_technique} ({side['label']})",
@@ -586,6 +630,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         side["logs"][attacker["id"]].losses += 1
                         shift_momentum(other_key)
                         ball_y = other["y_positions"].get(defender["id"], ball_y)
+                        side["possessor_id"] = None
+                        other["possessor_id"] = defender["id"]
                         if log.steals <= STEAL_POINTS_CAP:
                             timeline.append((
                                 minute,
@@ -599,6 +645,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         log.clearances += 1
                         shift_momentum(other_key)
                         ball_y = other["y_positions"].get(defender["id"], ball_y)
+                        side["possessor_id"] = None
+                        other["possessor_id"] = defender["id"]
                         if log.clearances <= CLEARANCE_POINTS_CAP:
                             timeline.append((
                                 minute,
@@ -630,13 +678,18 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "against": attacker["nombre"], "against_id": attacker["id"]},
                     ))
                 if random.random() < CLEARANCE_RECOVERED_BY_OWN_TEAM_CHANCE:
-                    # A teammate of the clearer actually gets to the loose ball.
+                    # A teammate of the clearer actually gets to the loose ball
+                    # — unspecified who, so don't bias the next pick to anyone.
                     shift_momentum(other_key)
                     ball_y = other["y_positions"].get(defender["id"], ball_y)
+                    other["possessor_id"] = None
                 else:
-                    # Falls to the team that was pressuring in the first place.
+                    # Falls to the team that was pressuring in the first
+                    # place — again a scramble, no specific recipient.
                     shift_momentum(side_key)
                     ball_y = max(15.0, min(85.0, ball_y + random.uniform(-15, 15)))
+                    other["possessor_id"] = None
+            side["possessor_id"] = None
             side["last_passer"] = None
 
         elif roll < 0.82:
@@ -664,12 +717,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 log.interceptions += 1
                 shift_momentum(other_key)
                 ball_y = other["y_positions"].get(defender["id"], ball_y)
+                other["possessor_id"] = defender["id"]
                 if log.interceptions <= INTERCEPTION_POINTS_CAP:
                     timeline.append((
                         minute,
                         f"🎯 Intercepción de {defender['nombre']} ({other['label']})",
                         {"minute": minute, "type": "interception", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "from_player": attacker["nombre"], "from_id": attacker["id"]},
                     ))
+            side["possessor_id"] = None
             side["last_passer"] = None
 
         else:
@@ -715,6 +770,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 log.blocks += 1
                 shift_momentum(other_key)
                 ball_y = other["y_positions"].get(blocker["id"], ball_y)
+                side["possessor_id"] = None
+                other["possessor_id"] = blocker["id"]
                 if log.blocks <= BLOCK_POINTS_CAP:
                     if block_technique:
                         timeline.append((
@@ -818,10 +875,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 # rather than carrying over the scorer's momentum.
                 momentum = home_possession_prob
                 ball_y = 50.0
+                side["possessor_id"] = None
+                other["possessor_id"] = None
             elif gk and (save_technique or random.random() < 0.6):
                 other["logs"][gk["id"]].saves += 1
                 shift_momentum(other_key)
                 ball_y = 50.0
+                side["possessor_id"] = None
+                other["possessor_id"] = gk["id"]
                 if save_technique:
                     timeline.append((
                         minute,
@@ -836,6 +897,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     ))
             else:
                 shift_momentum(other_key)
+                side["possessor_id"] = None
+                other["possessor_id"] = None
                 timeline.append((
                     minute,
                     f"🚫 Disparo fuera de {attacker['nombre']} ({side['label']})",
