@@ -4,12 +4,40 @@
 <div class="page-header">
   <div>
     <h1>Mercado semanal (puja)</h1>
-    <p class="muted">{{ league.name }} · Gastado en plantilla: {{ spent|euros }} · Comprometido en pujas: {{ committed|euros }}{{ ' · Bono acumulado: ' + bonus_budget|euros if bonus_budget else '' }} · Disponible: <strong>{{ available|euros }}</strong></p>
+    <p class="muted">{{ league.name }}</p>
   </div>
   <div class="page-header-actions">
     <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">Ver mi equipo</a>
     <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
   </div>
+</div>
+
+<div class="card budget-summary">
+  <div class="budget-tiles">
+    <div class="budget-tile">
+      <span class="budget-tile-label">Presupuesto total</span>
+      <span class="budget-tile-value">{{ total_budget|euros }}</span>
+    </div>
+    <div class="budget-tile budget-tile-spent">
+      <span class="budget-tile-label">🎽 Gastado en plantilla</span>
+      <span class="budget-tile-value">{{ spent|euros }}</span>
+    </div>
+    <div class="budget-tile budget-tile-committed">
+      <span class="budget-tile-label">🔒 Comprometido en pujas</span>
+      <span class="budget-tile-value">{{ committed|euros }}</span>
+    </div>
+    <div class="budget-tile budget-tile-available">
+      <span class="budget-tile-label">💰 Disponible</span>
+      <span class="budget-tile-value">{{ available|euros }}</span>
+    </div>
+  </div>
+  <div class="budget-bar" title="Gastado: {{ spent|euros }} · Comprometido en pujas: {{ committed|euros }} · Disponible: {{ available|euros }}">
+    <div class="budget-bar-fill budget-bar-spent" style="width: {{ spent_pct }}%"></div>
+    <div class="budget-bar-fill budget-bar-committed" style="width: {{ committed_pct }}%"></div>
+  </div>
+  {% if bonus_budget %}
+  <p class="muted budget-bonus-note">✨ Incluye {{ bonus_budget|euros }} de bono acumulado por rendimiento en jornadas.</p>
+  {% endif %}
 </div>
 
 {% if market_resolved %}

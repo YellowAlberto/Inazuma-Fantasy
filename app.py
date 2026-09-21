@@ -1555,7 +1555,13 @@ def market(league_id):
     spent = squad_spent(db, league_id, session["user_id"])
     committed = pending_bids_total(db, league_id, session["user_id"])
     bonus_budget = membership["bonus_budget"] or 0
-    available = round(league["budget"] + bonus_budget - spent - committed)
+    total_budget = league["budget"] + bonus_budget
+    available = round(total_budget - spent - committed)
+    # Percentages for the budget bar, capped so spent+committed never
+    # visually overflows past 100% even in edge cases (e.g. a negative
+    # available balance from a clause payment right at the wire).
+    spent_pct = round(min(100, spent / total_budget * 100), 1) if total_budget > 0 else 0
+    committed_pct = round(min(100 - spent_pct, committed / total_budget * 100), 1) if total_budget > 0 else 0
 
     arquetipos = [
         r["arquetipo"]
@@ -1570,7 +1576,10 @@ def market(league_id):
         spent=round(spent),
         committed=round(committed),
         available=available,
+        total_budget=round(total_budget),
         bonus_budget=round(bonus_budget),
+        spent_pct=spent_pct,
+        committed_pct=committed_pct,
         market_resolved=bool(league["market_resolved"]),
         posicion=posicion,
         arquetipo=arquetipo,
