@@ -1,5 +1,7 @@
 import json
+import re
 import sqlite3
+import unicodedata
 from pathlib import Path
 
 from scoring import compute_price_from_form_index, generate_league_pool
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS players (
 CREATE TABLE IF NOT EXISTS leagues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    slug TEXT,
     invite_code TEXT UNIQUE NOT NULL,
     budget REAL NOT NULL DEFAULT 60,
     creator_id INTEGER NOT NULL,
@@ -197,6 +200,41 @@ CREATE TABLE IF NOT EXISTS fixtures (
 """
 
 
+def slugify_league_name(name):
+    """Turns a league name into a URL-friendly slug: lowercase, ASCII,
+    words separated by hyphens (e.g. 'Liga de los Élites!' -> 'liga-de-los-elites')."""
+    text = unicodedata.normalize("NFKD", name or "").encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    return text or "liga"
+
+
+def unique_league_slug(conn, name, exclude_id=None):
+    """Picks a slug for a league that isn't already taken by another
+    league, appending -2, -3, ... if the plain slugified name collides."""
+    base = slugify_league_name(name)
+    slug = base
+    suffix = 2
+    while True:
+        query = "SELECT id FROM leagues WHERE slug = ?"
+        params = [slug]
+        if exclude_id is not None:
+            query += " AND id != ?"
+            params.append(exclude_id)
+        if not conn.execute(query, params).fetchone():
+            return slug
+        slug = f"{base}-{suffix}"
+        suffix += 1
+
+
+def _backfill_league_slugs(conn):
+    """Gives every league that doesn't have a slug yet (new column, or a
+    league inserted before slugs existed) one derived from its name."""
+    rows = conn.execute("SELECT id, name FROM leagues WHERE slug IS NULL OR slug = ''").fetchall()
+    for row in rows:
+        slug = unique_league_slug(conn, row["name"], exclude_id=row["id"])
+        conn.execute("UPDATE leagues SET slug = ? WHERE id = ?", (slug, row["id"]))
+
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -230,6 +268,8 @@ def _run_migrations(conn):
         conn.execute("ALTER TABLE leagues ADD COLUMN schedule_json TEXT NOT NULL DEFAULT '[]'")
     if "ended" not in league_cols:
         conn.execute("ALTER TABLE leagues ADD COLUMN ended INTEGER NOT NULL DEFAULT 0")
+    if "slug" not in league_cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN slug TEXT")
 
     member_cols = [row["name"] for row in conn.execute("PRAGMA table_info(league_members)").fetchall()]
     if "formation" not in member_cols:
@@ -325,6 +365,7 @@ def _run_migrations(conn):
     _backfill_scout_flags_from_seed(conn)
     _backfill_victory_road_club_scout_fix(conn)
     _backfill_league_pools(conn)
+    _backfill_league_slugs(conn)
 
     # Fix sprite paths from an earlier version that pointed at /sprites/...
     # instead of Flask's actual static route /static/sprites/...

@@ -61,11 +61,15 @@ def run():
     print(f"[{now.isoformat()}] weekday={weekday} market_day={is_market_day} match_day={is_match_day}")
 
     db = get_connection()
-    leagues = db.execute("SELECT id, name FROM leagues").fetchall()
+    leagues = db.execute("SELECT id, name, slug FROM leagues").fetchall()
     print(f"Found {len(leagues)} league(s).")
 
     for league in leagues:
         league_id, name = league["id"], league["name"]
+        # Falls back to the raw numeric id if a league somehow has no slug
+        # yet (shouldn't happen once app.py's migration has run at least
+        # once, but this script can run standalone).
+        slug = league["slug"] or str(league_id)
 
         if is_market_day:
             try:
@@ -74,7 +78,7 @@ def run():
                 send_discord_message(embed={
                     "title": f"🛒 {name} — Mercado cerrado",
                     "description": format_market_sold_for_discord(sold),
-                    "url": _league_url(f"/leagues/{league_id}/market"),
+                    "url": _league_url(f"/leagues/{slug}/market"),
                     "color": DISCORD_COLOR_MARKET,
                 })
             except Exception as exc:
@@ -88,7 +92,7 @@ def run():
                     send_discord_message(embed={
                         "title": f"⚽ {name} — Jornada {result} jugada",
                         "description": format_gameweek_results_for_discord(db, league_id, result),
-                        "url": _league_url(f"/leagues/{league_id}/gameweeks/latest"),
+                        "url": _league_url(f"/leagues/{slug}/gameweeks/latest"),
                         "color": DISCORD_COLOR_GAMEWEEK,
                     })
                 else:

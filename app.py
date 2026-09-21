@@ -16,8 +16,9 @@ except Exception:  # pragma: no cover - extremely unlikely on a modern Python
 import requests
 from flask import Flask, g, jsonify, redirect, render_template, request, session, url_for, flash
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.routing import BaseConverter, ValidationError
 
-from db import get_connection, init_db
+from db import get_connection, init_db, unique_league_slug
 from scoring import (
     ALL_SEASONS,
     DEFAULT_FORMATION,
@@ -44,6 +45,38 @@ app.secret_key = os.environ.get(
     "SECRET_KEY",
     "inazuma-fantasy-dev-secret-change-me",  # only used for local testing; never used in production
 )
+
+
+class LeagueSlugConverter(BaseConverter):
+    """URL converter for league routes: the URL carries the league's slug
+    (e.g. 'inazuma-legends') instead of its raw numeric id, but every view
+    function still receives a plain int league_id exactly as before —
+    to_python() resolves slug -> id on the way in, to_url() resolves
+    id -> slug on the way out (so every existing url_for(..., league_id=X)
+    call and every {{ url_for(...) }} in the templates keeps working
+    unchanged)."""
+
+    def to_python(self, value):
+        db = get_db()
+        row = db.execute("SELECT id FROM leagues WHERE slug = ?", (value,)).fetchone()
+        if row:
+            return row["id"]
+        # Backward compatibility: a link shared/bookmarked before this
+        # change still has the raw numeric id in it — keep it working.
+        if value.isdigit():
+            row = db.execute("SELECT id FROM leagues WHERE id = ?", (int(value),)).fetchone()
+            if row:
+                return row["id"]
+        raise ValidationError()
+
+    def to_url(self, value):
+        db = get_db()
+        row = db.execute("SELECT slug FROM leagues WHERE id = ?", (value,)).fetchone()
+        slug = row["slug"] if row and row["slug"] else str(value)
+        return super().to_url(slug)
+
+
+app.url_map.converters["league"] = LeagueSlugConverter
 
 
 @app.template_filter("display_season")
@@ -1068,7 +1101,7 @@ def admin_leagues():
     )
 
 
-@app.route("/admin/leagues/<int:league_id>")
+@app.route("/admin/leagues/<league:league_id>")
 @admin_required
 def admin_league_detail(league_id):
     db = get_db()
@@ -1093,7 +1126,7 @@ def admin_league_detail(league_id):
     return render_template("admin_league_detail.html", league=league, members=members)
 
 
-@app.route("/admin/leagues/<int:league_id>/max-members", methods=["POST"])
+@app.route("/admin/leagues/<league:league_id>/max-members", methods=["POST"])
 @admin_required
 def admin_set_max_members(league_id):
     db = get_db()
@@ -1119,7 +1152,7 @@ def admin_set_max_members(league_id):
     return redirect(url_for("admin_league_detail", league_id=league_id))
 
 
-@app.route("/admin/leagues/<int:league_id>/members/<int:user_id>")
+@app.route("/admin/leagues/<league:league_id>/members/<int:user_id>")
 @admin_required
 def admin_member_roster(league_id, user_id):
     db = get_db()
@@ -1169,7 +1202,7 @@ def admin_member_roster(league_id, user_id):
     )
 
 
-@app.route("/admin/leagues/<int:league_id>/members/<int:user_id>/add", methods=["POST"])
+@app.route("/admin/leagues/<league:league_id>/members/<int:user_id>/add", methods=["POST"])
 @admin_required
 def admin_add_player(league_id, user_id):
     db = get_db()
@@ -1212,7 +1245,7 @@ def admin_add_player(league_id, user_id):
     return redirect(url_for("admin_member_roster", league_id=league_id, user_id=user_id))
 
 
-@app.route("/admin/leagues/<int:league_id>/members/<int:user_id>/remove", methods=["POST"])
+@app.route("/admin/leagues/<league:league_id>/members/<int:user_id>/remove", methods=["POST"])
 @admin_required
 def admin_remove_player(league_id, user_id):
     db = get_db()
@@ -1307,9 +1340,11 @@ def create_league():
 
     db = get_db()
     code = generate_invite_code(db)
+    slug = unique_league_slug(db, name)
     cur = db.execute(
-        "INSERT INTO leagues (name, invite_code, budget, creator_id, seasons, scout_filter) VALUES (?, ?, ?, ?, ?, ?)",
-        (name, code, budget, session["user_id"], seasons_str, scout_filter),
+        "INSERT INTO leagues (name, slug, invite_code, budget, creator_id, seasons, scout_filter) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (name, slug, code, budget, session["user_id"], seasons_str, scout_filter),
     )
     league_id = cur.lastrowid
     regenerate_league_schedule(db, league_id, 1)
@@ -1364,7 +1399,7 @@ def join_league():
     return redirect(url_for("team", league_id=league["id"], new_squad=1))
 
 
-@app.route("/leagues/<int:league_id>")
+@app.route("/leagues/<league:league_id>")
 @login_required
 def league_detail(league_id):
     league, membership = require_membership(league_id)
@@ -1406,7 +1441,7 @@ def league_detail(league_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/delete", methods=["POST"])
+@app.route("/leagues/<league:league_id>/delete", methods=["POST"])
 @login_required
 def delete_league(league_id):
     league = get_league_or_404(league_id)
@@ -1452,7 +1487,7 @@ def delete_league(league_id):
 # ---------------------------------------------------------------------------
 # Weekly market & bidding
 # ---------------------------------------------------------------------------
-@app.route("/leagues/<int:league_id>/market")
+@app.route("/leagues/<league:league_id>/market")
 @login_required
 def market(league_id):
     league, membership = require_membership(league_id)
@@ -1544,7 +1579,7 @@ def market(league_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/players/<int:player_id>/detail")
+@app.route("/leagues/<league:league_id>/players/<int:player_id>/detail")
 @login_required
 def player_detail_json(league_id, player_id):
     """JSON detail for the player-card popup: base stats, points per jornada
@@ -1628,7 +1663,7 @@ def player_detail_json(league_id, player_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/market/bid/<int:player_id>", methods=["POST"])
+@app.route("/leagues/<league:league_id>/market/bid/<int:player_id>", methods=["POST"])
 @login_required
 def place_bid(league_id, player_id):
     def market_redirect():
@@ -1692,7 +1727,7 @@ def place_bid(league_id, player_id):
     return market_redirect()
 
 
-@app.route("/leagues/<int:league_id>/market/bid/<int:player_id>/cancel", methods=["POST"])
+@app.route("/leagues/<league:league_id>/market/bid/<int:player_id>/cancel", methods=["POST"])
 @login_required
 def cancel_bid(league_id, player_id):
     league, membership = require_membership(league_id)
@@ -1719,7 +1754,7 @@ def cancel_bid(league_id, player_id):
 # ---------------------------------------------------------------------------
 # Squad, formation & starting lineup
 # ---------------------------------------------------------------------------
-@app.route("/leagues/<int:league_id>/team/<int:user_id>")
+@app.route("/leagues/<league:league_id>/team/<int:user_id>")
 @login_required
 def view_member_team(league_id, user_id):
     """Read-only view of another manager's squad/lineup in this league —
@@ -1786,7 +1821,7 @@ def view_member_team(league_id, user_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/team")
+@app.route("/leagues/<league:league_id>/team")
 @login_required
 def team(league_id):
     league, membership = require_membership(league_id)
@@ -1869,7 +1904,7 @@ def team(league_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/team/save", methods=["POST"])
+@app.route("/leagues/<league:league_id>/team/save", methods=["POST"])
 @login_required
 def save_team(league_id):
     league, membership = require_membership(league_id)
@@ -1962,7 +1997,7 @@ def save_team(league_id):
     return redirect(url_for("team", league_id=league_id))
 
 
-@app.route("/leagues/<int:league_id>/team/drop/<int:player_id>", methods=["POST"])
+@app.route("/leagues/<league:league_id>/team/drop/<int:player_id>", methods=["POST"])
 @login_required
 def drop_player(league_id, player_id):
     league, membership = require_membership(league_id)
@@ -2025,7 +2060,7 @@ def drop_player(league_id, player_id):
     return redirect(url_for("team", league_id=league_id))
 
 
-@app.route("/leagues/<int:league_id>/team/increase-clause/<int:player_id>", methods=["POST"])
+@app.route("/leagues/<league:league_id>/team/increase-clause/<int:player_id>", methods=["POST"])
 @login_required
 def increase_clause(league_id, player_id):
     """The owner pays extra budget to raise their own player's release
@@ -2073,7 +2108,7 @@ def increase_clause(league_id, player_id):
     return redirect(url_for("team", league_id=league_id))
 
 
-@app.route("/leagues/<int:league_id>/team/buy-clause/<int:player_id>", methods=["POST"])
+@app.route("/leagues/<league:league_id>/team/buy-clause/<int:player_id>", methods=["POST"])
 @login_required
 def buy_clause(league_id, player_id):
     """Pays another manager's player's release clause, instantly taking
@@ -2167,7 +2202,7 @@ def compute_standings(db, league_id):
 # ---------------------------------------------------------------------------
 # Standings & gameweeks
 # ---------------------------------------------------------------------------
-@app.route("/leagues/<int:league_id>/standings")
+@app.route("/leagues/<league:league_id>/standings")
 @login_required
 def standings(league_id):
     league, membership = require_membership(league_id)
@@ -2180,7 +2215,7 @@ def standings(league_id):
     return render_template("standings.html", league=league, standings=rows)
 
 
-@app.route("/leagues/<int:league_id>/leaderboards")
+@app.route("/leagues/<league:league_id>/leaderboards")
 @login_required
 def leaderboards(league_id):
     league, membership = require_membership(league_id)
@@ -2220,7 +2255,7 @@ def leaderboards(league_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/gameweeks")
+@app.route("/leagues/<league:league_id>/gameweeks")
 @login_required
 def gameweeks(league_id):
     league, membership = require_membership(league_id)
@@ -2257,7 +2292,7 @@ def gameweeks(league_id):
     )
 
 
-@app.route("/leagues/<int:league_id>/end", methods=["POST"])
+@app.route("/leagues/<league:league_id>/end", methods=["POST"])
 @login_required
 def end_league(league_id):
     league = get_league_or_404(league_id)
@@ -2281,7 +2316,7 @@ def end_league(league_id):
     return redirect(url_for("gameweeks", league_id=league_id))
 
 
-@app.route("/leagues/<int:league_id>/gameweeks/latest")
+@app.route("/leagues/<league:league_id>/gameweeks/latest")
 @login_required
 def gameweek_latest(league_id):
     """Redirects to whichever gameweek is currently the league's most
@@ -2297,7 +2332,7 @@ def gameweek_latest(league_id):
     return redirect(url_for("gameweek_detail", league_id=league_id, number=league["current_gameweek"]))
 
 
-@app.route("/leagues/<int:league_id>/gameweeks/<int:number>")
+@app.route("/leagues/<league:league_id>/gameweeks/<int:number>")
 @login_required
 def gameweek_detail(league_id, number):
     league, membership = require_membership(league_id)
@@ -2476,7 +2511,7 @@ def format_gameweek_results_for_discord(db, league_id, number):
     return "\n".join(lines)
 
 
-@app.route("/leagues/<int:league_id>/resolve-market", methods=["POST"])
+@app.route("/leagues/<league:league_id>/resolve-market", methods=["POST"])
 @login_required
 def resolve_market(league_id):
     league = get_league_or_404(league_id)
@@ -2499,7 +2534,7 @@ def resolve_market(league_id):
     return redirect(url_for("gameweeks", league_id=league_id))
 
 
-@app.route("/leagues/<int:league_id>/advance", methods=["POST"])
+@app.route("/leagues/<league:league_id>/advance", methods=["POST"])
 @login_required
 def advance_gameweek(league_id):
     league = get_league_or_404(league_id)
