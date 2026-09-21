@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS leagues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     slug TEXT,
+    discord_webhook TEXT,
     invite_code TEXT UNIQUE NOT NULL,
     budget REAL NOT NULL DEFAULT 60,
     creator_id INTEGER NOT NULL,
@@ -270,6 +271,8 @@ def _run_migrations(conn):
         conn.execute("ALTER TABLE leagues ADD COLUMN ended INTEGER NOT NULL DEFAULT 0")
     if "slug" not in league_cols:
         conn.execute("ALTER TABLE leagues ADD COLUMN slug TEXT")
+    if "discord_webhook" not in league_cols:
+        conn.execute("ALTER TABLE leagues ADD COLUMN discord_webhook TEXT")
 
     member_cols = [row["name"] for row in conn.execute("PRAGMA table_info(league_members)").fetchall()]
     if "formation" not in member_cols:

@@ -1441,6 +1441,29 @@ def league_detail(league_id):
     )
 
 
+@app.route("/leagues/<league:league_id>/discord-webhook", methods=["POST"])
+@login_required
+def set_discord_webhook(league_id):
+    league = get_league_or_404(league_id)
+    if not league:
+        flash("Liga no encontrada.", "error")
+        return redirect(url_for("leagues"))
+    if league["creator_id"] != session["user_id"]:
+        flash("Solo el creador de la liga puede configurar el webhook de Discord.", "error")
+        return redirect(url_for("league_detail", league_id=league_id))
+
+    webhook = request.form.get("discord_webhook", "").strip()
+    if webhook and not webhook.startswith("https://discord.com/api/webhooks/") and not webhook.startswith("https://discordapp.com/api/webhooks/"):
+        flash("Eso no parece una URL de webhook de Discord válida (debe empezar por https://discord.com/api/webhooks/...).", "error")
+        return redirect(url_for("league_detail", league_id=league_id))
+
+    db = get_db()
+    db.execute("UPDATE leagues SET discord_webhook = ? WHERE id = ?", (webhook or None, league_id))
+    db.commit()
+    flash("¡Webhook de Discord guardado! A partir de ahora los avisos de esta liga llegarán a ese canal." if webhook else "Webhook de Discord desactivado para esta liga.", "success")
+    return redirect(url_for("league_detail", league_id=league_id))
+
+
 @app.route("/leagues/<league:league_id>/delete", methods=["POST"])
 @login_required
 def delete_league(league_id):
@@ -2455,17 +2478,23 @@ DISCORD_COLOR_MARKET = 0xF5A623  # orange
 DISCORD_COLOR_GAMEWEEK = 0x4CAF50  # green
 
 
-def send_discord_message(content=None, embed=None):
-    """Posts a message to the configured Discord webhook. Silently does
-    nothing if DISCORD_WEBHOOK isn't set, and never lets a Discord failure
-    break the caller (market/gameweek logic must succeed either way).
+def send_discord_message(content=None, embed=None, webhook_url=None):
+    """Posts a message to a Discord webhook. Silently does nothing if no
+    webhook is available, and never lets a Discord failure break the
+    caller (market/gameweek logic must succeed either way).
+
+    `webhook_url` lets each LEAGUE use its own Discord channel (set by its
+    creator in the league's settings). If it's not given/empty, falls back
+    to the site-wide DISCORD_WEBHOOK env var (so leagues that haven't set
+    their own still work if that's configured).
 
     Pass `embed` (a dict with title/description/url/color) instead of, or
     together with, `content` to get a clean clickable title in Discord
     instead of a raw URL with league/gameweek IDs in it — Discord only
     turns a link into a plain, ugly line of text when it's pasted as plain
     content; inside an embed's `url` it becomes the title's hyperlink."""
-    if not DISCORD_WEBHOOK:
+    webhook = webhook_url or DISCORD_WEBHOOK
+    if not webhook:
         return
     payload = {}
     if content:
@@ -2475,7 +2504,7 @@ def send_discord_message(content=None, embed=None):
     if not payload:
         return
     try:
-        requests.post(DISCORD_WEBHOOK, json=payload, timeout=5)
+        requests.post(webhook, json=payload, timeout=5)
     except Exception:
         pass
 
@@ -2533,12 +2562,15 @@ def resolve_market(league_id):
 
     db = get_db()
     sold = rotate_market_for_league(db, league_id)
-    send_discord_message(embed={
-        "title": f"🛒 {league['name']} — Mercado cerrado",
-        "description": format_market_sold_for_discord(sold),
-        "url": league_url(url_for("market", league_id=league_id)),
-        "color": DISCORD_COLOR_MARKET,
-    })
+    send_discord_message(
+        embed={
+            "title": f"🛒 {league['name']} — Mercado cerrado",
+            "description": format_market_sold_for_discord(sold),
+            "url": league_url(url_for("market", league_id=league_id)),
+            "color": DISCORD_COLOR_MARKET,
+        },
+        webhook_url=league["discord_webhook"],
+    )
     flash("¡Mercado cerrado! Revisa quién ha ganado cada puja. Ya hay un mercado nuevo abierto.", "success")
     return redirect(url_for("gameweeks", league_id=league_id))
 
@@ -2560,12 +2592,15 @@ def advance_gameweek(league_id):
         flash(result, "error")
         return redirect(url_for("gameweeks", league_id=league_id))
 
-    send_discord_message(embed={
-        "title": f"⚽ {league['name']} — Jornada {result} jugada",
-        "description": format_gameweek_results_for_discord(db, league_id, result),
-        "url": league_url(url_for("gameweek_latest", league_id=league_id)),
-        "color": DISCORD_COLOR_GAMEWEEK,
-    })
+    send_discord_message(
+        embed={
+            "title": f"⚽ {league['name']} — Jornada {result} jugada",
+            "description": format_gameweek_results_for_discord(db, league_id, result),
+            "url": league_url(url_for("gameweek_latest", league_id=league_id)),
+            "color": DISCORD_COLOR_GAMEWEEK,
+        },
+        webhook_url=league["discord_webhook"],
+    )
     flash(f"¡Jornada {result} jugada!", "success")
     return redirect(url_for("gameweek_detail", league_id=league_id, number=result))
 
@@ -2594,24 +2629,27 @@ def run_daily_task():
     is_match_day = weekday in (4, 5, 6)  # Friday-Saturday-Sunday
 
     db = get_db()
-    leagues = rows_to_list(db.execute("SELECT id, name FROM leagues").fetchall())
+    leagues = rows_to_list(db.execute("SELECT id, name, discord_webhook FROM leagues").fetchall())
 
     lines = [f"{now.isoformat()} weekday={weekday} market_day={is_market_day} match_day={is_match_day}"]
     lines.append(f"Found {len(leagues)} league(s).")
 
     for league in leagues:
-        league_id, name = league["id"], league["name"]
+        league_id, name, webhook = league["id"], league["name"], league["discord_webhook"]
 
         if is_market_day:
             try:
                 sold = rotate_market_for_league(db, league_id)
                 lines.append(f"[{name}] market rotated OK")
-                send_discord_message(embed={
-                    "title": f"🛒 {name} — Mercado cerrado",
-                    "description": format_market_sold_for_discord(sold),
-                    "url": league_url(url_for("market", league_id=league_id)),
-                    "color": DISCORD_COLOR_MARKET,
-                })
+                send_discord_message(
+                    embed={
+                        "title": f"🛒 {name} — Mercado cerrado",
+                        "description": format_market_sold_for_discord(sold),
+                        "url": league_url(url_for("market", league_id=league_id)),
+                        "color": DISCORD_COLOR_MARKET,
+                    },
+                    webhook_url=webhook,
+                )
             except Exception as exc:
                 lines.append(f"[{name}] market rotation FAILED: {exc}")
 
@@ -2620,12 +2658,15 @@ def run_daily_task():
                 ok, result = play_gameweek_for_league(db, league_id)
                 if ok:
                     lines.append(f"[{name}] gameweek {result} played OK")
-                    send_discord_message(embed={
-                        "title": f"⚽ {name} — Jornada {result} jugada",
-                        "description": format_gameweek_results_for_discord(db, league_id, result),
-                        "url": league_url(url_for("gameweek_latest", league_id=league_id)),
-                        "color": DISCORD_COLOR_GAMEWEEK,
-                    })
+                    send_discord_message(
+                        embed={
+                            "title": f"⚽ {name} — Jornada {result} jugada",
+                            "description": format_gameweek_results_for_discord(db, league_id, result),
+                            "url": league_url(url_for("gameweek_latest", league_id=league_id)),
+                            "color": DISCORD_COLOR_GAMEWEEK,
+                        },
+                        webhook_url=webhook,
+                    )
                 else:
                     lines.append(f"[{name}] gameweek NOT played: {result}")
             except Exception as exc:

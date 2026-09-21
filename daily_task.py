@@ -61,11 +61,11 @@ def run():
     print(f"[{now.isoformat()}] weekday={weekday} market_day={is_market_day} match_day={is_match_day}")
 
     db = get_connection()
-    leagues = db.execute("SELECT id, name, slug FROM leagues").fetchall()
+    leagues = db.execute("SELECT id, name, slug, discord_webhook FROM leagues").fetchall()
     print(f"Found {len(leagues)} league(s).")
 
     for league in leagues:
-        league_id, name = league["id"], league["name"]
+        league_id, name, webhook = league["id"], league["name"], league["discord_webhook"]
         # Falls back to the raw numeric id if a league somehow has no slug
         # yet (shouldn't happen once app.py's migration has run at least
         # once, but this script can run standalone).
@@ -75,12 +75,15 @@ def run():
             try:
                 sold = rotate_market_for_league(db, league_id)
                 print(f"  [{name}] market rotated OK")
-                send_discord_message(embed={
-                    "title": f"🛒 {name} — Mercado cerrado",
-                    "description": format_market_sold_for_discord(sold),
-                    "url": _league_url(f"/leagues/{slug}/market"),
-                    "color": DISCORD_COLOR_MARKET,
-                })
+                send_discord_message(
+                    embed={
+                        "title": f"🛒 {name} — Mercado cerrado",
+                        "description": format_market_sold_for_discord(sold),
+                        "url": _league_url(f"/leagues/{slug}/market"),
+                        "color": DISCORD_COLOR_MARKET,
+                    },
+                    webhook_url=webhook,
+                )
             except Exception as exc:
                 print(f"  [{name}] market rotation FAILED: {exc}")
 
@@ -89,12 +92,15 @@ def run():
                 ok, result = play_gameweek_for_league(db, league_id)
                 if ok:
                     print(f"  [{name}] gameweek {result} played OK")
-                    send_discord_message(embed={
-                        "title": f"⚽ {name} — Jornada {result} jugada",
-                        "description": format_gameweek_results_for_discord(db, league_id, result),
-                        "url": _league_url(f"/leagues/{slug}/gameweeks/latest"),
-                        "color": DISCORD_COLOR_GAMEWEEK,
-                    })
+                    send_discord_message(
+                        embed={
+                            "title": f"⚽ {name} — Jornada {result} jugada",
+                            "description": format_gameweek_results_for_discord(db, league_id, result),
+                            "url": _league_url(f"/leagues/{slug}/gameweeks/latest"),
+                            "color": DISCORD_COLOR_GAMEWEEK,
+                        },
+                        webhook_url=webhook,
+                    )
                 else:
                     print(f"  [{name}] gameweek NOT played: {result}")
             except Exception as exc:

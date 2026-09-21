@@ -36,6 +36,29 @@
 </div>
 
 {% if is_creator %}
+<h2 class="section-title">Ajustes</h2>
+<form class="card form-card" method="post" action="{{ url_for('set_discord_webhook', league_id=league.id) }}">
+  <h3>🔔 Avisos en Discord</h3>
+  <p class="muted">
+    Si quieres que esta liga avise en un canal de Discord cada vez que se cierra el mercado o se juega una
+    jornada, pega aquí la URL del webhook de ese canal (en Discord: Ajustes del canal → Integraciones →
+    Webhooks → Nuevo webhook → Copiar URL del webhook). Solo tú, como creador de la liga, puedes verla y
+    cambiarla.
+  </p>
+  <label for="discord_webhook">URL del webhook</label>
+  <input
+    type="url"
+    id="discord_webhook"
+    name="discord_webhook"
+    placeholder="https://discord.com/api/webhooks/..."
+    value="{{ league.discord_webhook or '' }}"
+  >
+  <button class="btn btn-secondary" type="submit">Guardar</button>
+  <p class="muted" style="margin-top: 8px;">
+    {% if league.discord_webhook %}✅ Esta liga tiene un webhook configurado. Borra el campo y guarda para desactivarlo.{% else %}Esta liga no tiene ningún webhook configurado todavía.{% endif %}
+  </p>
+</form>
+
 <h2 class="section-title">Zona de peligro</h2>
 <form class="card form-card danger-zone" method="post" action="{{ url_for('delete_league', league_id=league.id) }}"
       onsubmit="return confirm('¿Seguro que quieres eliminar esta liga? Se borrarán TODOS sus equipos, pujas y jornadas jugadas. Esta acción no se puede deshacer.');">
