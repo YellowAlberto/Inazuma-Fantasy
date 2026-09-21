@@ -29,7 +29,14 @@ try:
 except Exception:  # pragma: no cover - extremely unlikely on a modern Python
     MADRID_TZ = None
 
-from app import rotate_market_for_league, play_gameweek_for_league, send_discord_message, PYTHONANYWHERE_DOMAIN
+from app import (
+    rotate_market_for_league,
+    play_gameweek_for_league,
+    send_discord_message,
+    format_market_sold_for_discord,
+    format_gameweek_results_for_discord,
+    PYTHONANYWHERE_DOMAIN,
+)
 from db import get_connection
 
 
@@ -60,10 +67,11 @@ def run():
 
         if is_market_day:
             try:
-                rotate_market_for_league(db, league_id)
+                sold = rotate_market_for_league(db, league_id)
                 print(f"  [{name}] market rotated OK")
                 send_discord_message(
                     f"🛒 **{name}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
+                    f"{format_market_sold_for_discord(sold)}\n"
                     f"{_league_url(f'/leagues/{league_id}/market')}"
                 )
             except Exception as exc:
@@ -75,7 +83,8 @@ def run():
                 if ok:
                     print(f"  [{name}] gameweek {result} played OK")
                     send_discord_message(
-                        f"⚽ **{name}** — ¡Jornada {result} jugada! Ya puedes ver los resultados.\n"
+                        f"⚽ **{name}** — ¡Jornada {result} jugada! Resultados:\n"
+                        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
                         f"{_league_url(f'/leagues/{league_id}/gameweeks/{result}')}"
                     )
                 else:

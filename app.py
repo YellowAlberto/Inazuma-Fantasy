@@ -519,16 +519,22 @@ def rotate_market_for_league(db, league_id):
     (awarding each player to the highest bidder) and immediately opens a
     fresh pool. This is the daily market rotation — it doesn't touch
     gameweeks/fixtures at all, so it can run any day of the week,
-    independently of whether a match day is also being played."""
+    independently of whether a match day is also being played.
+
+    Returns a list of dicts (one per player that actually got sold, i.e.
+    had at least one bid) with keys: player (name), team (buyer's team
+    name), amount — so callers can announce who signed whom."""
     league = row_to_dict(db.execute("SELECT * FROM leagues WHERE id = ?", (league_id,)).fetchone())
     if not league:
-        return
+        return []
 
     next_number = league["current_gameweek"] + 1
     market_ids = [
         r["player_id"]
         for r in db.execute("SELECT player_id FROM league_market WHERE league_id = ?", (league_id,)).fetchall()
     ]
+
+    sold = []
 
     for pid in market_ids:
         bids = db.execute(
@@ -538,7 +544,8 @@ def rotate_market_for_league(db, league_id):
             top_amount = max(b["amount"] for b in bids)
             winners = [b for b in bids if b["amount"] == top_amount]
             winner = random.choice(winners)
-            base_price = db.execute("SELECT price FROM players WHERE id = ?", (pid,)).fetchone()["price"]
+            player_row = db.execute("SELECT nombre, price FROM players WHERE id = ?", (pid,)).fetchone()
+            base_price = player_row["price"]
             db.execute(
                 "INSERT OR IGNORE INTO rosters (league_id, user_id, player_id, acquired_price, clause_value) "
                 "VALUES (?, ?, ?, ?, ?)",
@@ -548,6 +555,17 @@ def rotate_market_for_league(db, league_id):
                 "INSERT INTO market_results (league_id, gameweek_number, player_id, winner_user_id, amount) "
                 "VALUES (?, ?, ?, ?, ?)",
                 (league_id, next_number, pid, winner["user_id"], top_amount),
+            )
+            team_row = db.execute(
+                "SELECT team_name FROM league_members WHERE league_id = ? AND user_id = ?",
+                (league_id, winner["user_id"]),
+            ).fetchone()
+            sold.append(
+                {
+                    "player": player_row["nombre"],
+                    "team": team_row["team_name"] if team_row else "—",
+                    "amount": top_amount,
+                }
             )
         else:
             db.execute(
@@ -562,6 +580,9 @@ def rotate_market_for_league(db, league_id):
     league = row_to_dict(db.execute("SELECT * FROM leagues WHERE id = ?", (league_id,)).fetchone())
     refresh_league_market(db, league)
     db.commit()
+
+    sold.sort(key=lambda s: s["amount"], reverse=True)
+    return sold
 
 
 def play_gameweek_for_league(db, league_id):
@@ -2382,6 +2403,46 @@ def send_discord_message(content):
         pass
 
 
+DISCORD_LIST_LIMIT = 25  # cap long lists so a single message never gets anywhere near Discord's 2000-char limit
+
+
+def format_market_sold_for_discord(sold):
+    """Turns the list returned by rotate_market_for_league() into a
+    readable bullet list of who signed whom for how much."""
+    if not sold:
+        return "Nadie ha pujado por ningún jugador esta vez."
+    lines = [f"• **{s['player']}** → {s['team']} ({format_euros(s['amount'])})" for s in sold]
+    if len(lines) > DISCORD_LIST_LIMIT:
+        extra = len(lines) - DISCORD_LIST_LIMIT
+        lines = lines[:DISCORD_LIST_LIMIT] + [f"…y {extra} más."]
+    return "\n".join(lines)
+
+
+def fetch_gameweek_fixtures(db, league_id, number):
+    return rows_to_list(
+        db.execute(
+            "SELECT f.home_label, f.away_label, f.home_goals, f.away_goals "
+            "FROM fixtures f JOIN gameweeks g ON f.gameweek_id = g.id "
+            "WHERE g.league_id = ? AND g.number = ? ORDER BY f.id",
+            (league_id, number),
+        ).fetchall()
+    )
+
+
+def format_gameweek_results_for_discord(db, league_id, number):
+    """Builds a readable list of every fixture score for a played gameweek."""
+    fixtures = fetch_gameweek_fixtures(db, league_id, number)
+    if not fixtures:
+        return "No se han registrado partidos para esta jornada."
+    lines = [
+        f"• {f['home_label']} **{f['home_goals']}-{f['away_goals']}** {f['away_label']}" for f in fixtures
+    ]
+    if len(lines) > DISCORD_LIST_LIMIT:
+        extra = len(lines) - DISCORD_LIST_LIMIT
+        lines = lines[:DISCORD_LIST_LIMIT] + [f"…y {extra} más."]
+    return "\n".join(lines)
+
+
 @app.route("/leagues/<int:league_id>/resolve-market", methods=["POST"])
 @login_required
 def resolve_market(league_id):
@@ -2394,9 +2455,10 @@ def resolve_market(league_id):
         return redirect(url_for("gameweeks", league_id=league_id))
 
     db = get_db()
-    rotate_market_for_league(db, league_id)
+    sold = rotate_market_for_league(db, league_id)
     send_discord_message(
         f"🛒 **{league['name']}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
+        f"{format_market_sold_for_discord(sold)}\n"
         f"{league_url(url_for('market', league_id=league_id))}"
     )
     flash("¡Mercado cerrado! Revisa quién ha ganado cada puja. Ya hay un mercado nuevo abierto.", "success")
@@ -2421,7 +2483,8 @@ def advance_gameweek(league_id):
         return redirect(url_for("gameweeks", league_id=league_id))
 
     send_discord_message(
-        f"⚽ **{league['name']}** — ¡Jornada {result} jugada! Ya puedes ver los resultados.\n"
+        f"⚽ **{league['name']}** — ¡Jornada {result} jugada! Resultados:\n"
+        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
         f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
     )
     flash(f"¡Jornada {result} jugada!", "success")
@@ -2462,10 +2525,11 @@ def run_daily_task():
 
         if is_market_day:
             try:
-                rotate_market_for_league(db, league_id)
+                sold = rotate_market_for_league(db, league_id)
                 lines.append(f"[{name}] market rotated OK")
                 send_discord_message(
                     f"🛒 **{name}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
+                    f"{format_market_sold_for_discord(sold)}\n"
                     f"{league_url(url_for('market', league_id=league_id))}"
                 )
             except Exception as exc:
@@ -2477,7 +2541,8 @@ def run_daily_task():
                 if ok:
                     lines.append(f"[{name}] gameweek {result} played OK")
                     send_discord_message(
-                        f"⚽ **{name}** — ¡Jornada {result} jugada! Ya puedes ver los resultados.\n"
+                        f"⚽ **{name}** — ¡Jornada {result} jugada! Resultados:\n"
+                        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
                         f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
                     )
                 else:
