@@ -2281,6 +2281,22 @@ def end_league(league_id):
     return redirect(url_for("gameweeks", league_id=league_id))
 
 
+@app.route("/leagues/<int:league_id>/gameweeks/latest")
+@login_required
+def gameweek_latest(league_id):
+    """Redirects to whichever gameweek is currently the league's most
+    recent one. Exists so links (e.g. the Discord notification) don't need
+    to hardcode a jornada number that changes every week."""
+    league, membership = require_membership(league_id)
+    if not league:
+        flash("No perteneces a esta liga o no existe.", "error")
+        return redirect(url_for("leagues"))
+    if not league["current_gameweek"]:
+        flash("Esta liga todavía no ha jugado ninguna jornada.", "error")
+        return redirect(url_for("gameweeks", league_id=league_id))
+    return redirect(url_for("gameweek_detail", league_id=league_id, number=league["current_gameweek"]))
+
+
 @app.route("/leagues/<int:league_id>/gameweeks/<int:number>")
 @login_required
 def gameweek_detail(league_id, number):
@@ -2391,14 +2407,31 @@ def league_url(path):
     return path
 
 
-def send_discord_message(content):
+DISCORD_COLOR_MARKET = 0xF5A623  # orange
+DISCORD_COLOR_GAMEWEEK = 0x4CAF50  # green
+
+
+def send_discord_message(content=None, embed=None):
     """Posts a message to the configured Discord webhook. Silently does
     nothing if DISCORD_WEBHOOK isn't set, and never lets a Discord failure
-    break the caller (market/gameweek logic must succeed either way)."""
+    break the caller (market/gameweek logic must succeed either way).
+
+    Pass `embed` (a dict with title/description/url/color) instead of, or
+    together with, `content` to get a clean clickable title in Discord
+    instead of a raw URL with league/gameweek IDs in it — Discord only
+    turns a link into a plain, ugly line of text when it's pasted as plain
+    content; inside an embed's `url` it becomes the title's hyperlink."""
     if not DISCORD_WEBHOOK:
         return
+    payload = {}
+    if content:
+        payload["content"] = content
+    if embed:
+        payload["embeds"] = [embed]
+    if not payload:
+        return
     try:
-        requests.post(DISCORD_WEBHOOK, json={"content": content}, timeout=5)
+        requests.post(DISCORD_WEBHOOK, json=payload, timeout=5)
     except Exception:
         pass
 
@@ -2456,11 +2489,12 @@ def resolve_market(league_id):
 
     db = get_db()
     sold = rotate_market_for_league(db, league_id)
-    send_discord_message(
-        f"🛒 **{league['name']}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
-        f"{format_market_sold_for_discord(sold)}\n"
-        f"{league_url(url_for('market', league_id=league_id))}"
-    )
+    send_discord_message(embed={
+        "title": f"🛒 {league['name']} — Mercado cerrado",
+        "description": format_market_sold_for_discord(sold),
+        "url": league_url(url_for("market", league_id=league_id)),
+        "color": DISCORD_COLOR_MARKET,
+    })
     flash("¡Mercado cerrado! Revisa quién ha ganado cada puja. Ya hay un mercado nuevo abierto.", "success")
     return redirect(url_for("gameweeks", league_id=league_id))
 
@@ -2482,11 +2516,12 @@ def advance_gameweek(league_id):
         flash(result, "error")
         return redirect(url_for("gameweeks", league_id=league_id))
 
-    send_discord_message(
-        f"⚽ **{league['name']}** — ¡Jornada {result} jugada! Resultados:\n"
-        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
-        f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
-    )
+    send_discord_message(embed={
+        "title": f"⚽ {league['name']} — Jornada {result} jugada",
+        "description": format_gameweek_results_for_discord(db, league_id, result),
+        "url": league_url(url_for("gameweek_latest", league_id=league_id)),
+        "color": DISCORD_COLOR_GAMEWEEK,
+    })
     flash(f"¡Jornada {result} jugada!", "success")
     return redirect(url_for("gameweek_detail", league_id=league_id, number=result))
 
@@ -2527,11 +2562,12 @@ def run_daily_task():
             try:
                 sold = rotate_market_for_league(db, league_id)
                 lines.append(f"[{name}] market rotated OK")
-                send_discord_message(
-                    f"🛒 **{name}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
-                    f"{format_market_sold_for_discord(sold)}\n"
-                    f"{league_url(url_for('market', league_id=league_id))}"
-                )
+                send_discord_message(embed={
+                    "title": f"🛒 {name} — Mercado cerrado",
+                    "description": format_market_sold_for_discord(sold),
+                    "url": league_url(url_for("market", league_id=league_id)),
+                    "color": DISCORD_COLOR_MARKET,
+                })
             except Exception as exc:
                 lines.append(f"[{name}] market rotation FAILED: {exc}")
 
@@ -2540,11 +2576,12 @@ def run_daily_task():
                 ok, result = play_gameweek_for_league(db, league_id)
                 if ok:
                     lines.append(f"[{name}] gameweek {result} played OK")
-                    send_discord_message(
-                        f"⚽ **{name}** — ¡Jornada {result} jugada! Resultados:\n"
-                        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
-                        f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
-                    )
+                    send_discord_message(embed={
+                        "title": f"⚽ {name} — Jornada {result} jugada",
+                        "description": format_gameweek_results_for_discord(db, league_id, result),
+                        "url": league_url(url_for("gameweek_latest", league_id=league_id)),
+                        "color": DISCORD_COLOR_GAMEWEEK,
+                    })
                 else:
                     lines.append(f"[{name}] gameweek NOT played: {result}")
             except Exception as exc:

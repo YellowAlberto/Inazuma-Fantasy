@@ -35,6 +35,8 @@ from app import (
     send_discord_message,
     format_market_sold_for_discord,
     format_gameweek_results_for_discord,
+    DISCORD_COLOR_MARKET,
+    DISCORD_COLOR_GAMEWEEK,
     PYTHONANYWHERE_DOMAIN,
 )
 from db import get_connection
@@ -69,11 +71,12 @@ def run():
             try:
                 sold = rotate_market_for_league(db, league_id)
                 print(f"  [{name}] market rotated OK")
-                send_discord_message(
-                    f"🛒 **{name}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
-                    f"{format_market_sold_for_discord(sold)}\n"
-                    f"{_league_url(f'/leagues/{league_id}/market')}"
-                )
+                send_discord_message(embed={
+                    "title": f"🛒 {name} — Mercado cerrado",
+                    "description": format_market_sold_for_discord(sold),
+                    "url": _league_url(f"/leagues/{league_id}/market"),
+                    "color": DISCORD_COLOR_MARKET,
+                })
             except Exception as exc:
                 print(f"  [{name}] market rotation FAILED: {exc}")
 
@@ -82,11 +85,12 @@ def run():
                 ok, result = play_gameweek_for_league(db, league_id)
                 if ok:
                     print(f"  [{name}] gameweek {result} played OK")
-                    send_discord_message(
-                        f"⚽ **{name}** — ¡Jornada {result} jugada! Resultados:\n"
-                        f"{format_gameweek_results_for_discord(db, league_id, result)}\n"
-                        f"{_league_url(f'/leagues/{league_id}/gameweeks/{result}')}"
-                    )
+                    send_discord_message(embed={
+                        "title": f"⚽ {name} — Jornada {result} jugada",
+                        "description": format_gameweek_results_for_discord(db, league_id, result),
+                        "url": _league_url(f"/leagues/{league_id}/gameweeks/latest"),
+                        "color": DISCORD_COLOR_GAMEWEEK,
+                    })
                 else:
                     print(f"  [{name}] gameweek NOT played: {result}")
             except Exception as exc:
