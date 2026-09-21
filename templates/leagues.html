@@ -7,7 +7,10 @@
 
 <div class="league-grid">
   {% if not leagues %}
-    <p class="empty-state">Aún no estás en ninguna liga. ¡Crea una o únete con un código más abajo!</p>
+    <div class="card empty-box-card empty-box">
+      <div class="empty-box-icon">🏆</div>
+      <p>Aún no estás en ninguna liga. ¡Crea una o únete con un código más abajo!</p>
+    </div>
   {% endif %}
   {% for l in leagues %}
     <a href="{{ url_for('league_detail', league_id=l.id) }}" class="card league-card">

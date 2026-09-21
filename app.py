@@ -2353,6 +2353,35 @@ def gameweek_detail(league_id, number):
     )
 
 
+# ---------------------------------------------------------------------------
+# Discord notifications
+# ---------------------------------------------------------------------------
+# Set this via an environment variable (same place as SECRET_KEY /
+# SCHEDULER_TOKEN) — never hardcode the webhook URL here, since anyone with
+# it can post messages to the channel.
+DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK", "")
+
+
+def league_url(path):
+    """Builds an absolute URL to the deployed app for use in Discord
+    messages (Discord needs a full https:// link, not a relative path)."""
+    if PYTHONANYWHERE_DOMAIN:
+        return f"https://{PYTHONANYWHERE_DOMAIN}{path}"
+    return path
+
+
+def send_discord_message(content):
+    """Posts a message to the configured Discord webhook. Silently does
+    nothing if DISCORD_WEBHOOK isn't set, and never lets a Discord failure
+    break the caller (market/gameweek logic must succeed either way)."""
+    if not DISCORD_WEBHOOK:
+        return
+    try:
+        requests.post(DISCORD_WEBHOOK, json={"content": content}, timeout=5)
+    except Exception:
+        pass
+
+
 @app.route("/leagues/<int:league_id>/resolve-market", methods=["POST"])
 @login_required
 def resolve_market(league_id):
@@ -2366,6 +2395,10 @@ def resolve_market(league_id):
 
     db = get_db()
     rotate_market_for_league(db, league_id)
+    send_discord_message(
+        f"🛒 **{league['name']}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
+        f"{league_url(url_for('market', league_id=league_id))}"
+    )
     flash("¡Mercado cerrado! Revisa quién ha ganado cada puja. Ya hay un mercado nuevo abierto.", "success")
     return redirect(url_for("gameweeks", league_id=league_id))
 
@@ -2387,6 +2420,10 @@ def advance_gameweek(league_id):
         flash(result, "error")
         return redirect(url_for("gameweeks", league_id=league_id))
 
+    send_discord_message(
+        f"⚽ **{league['name']}** — ¡Jornada {result} jugada! Ya puedes ver los resultados.\n"
+        f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
+    )
     flash(f"¡Jornada {result} jugada!", "success")
     return redirect(url_for("gameweek_detail", league_id=league_id, number=result))
 
@@ -2427,6 +2464,10 @@ def run_daily_task():
             try:
                 rotate_market_for_league(db, league_id)
                 lines.append(f"[{name}] market rotated OK")
+                send_discord_message(
+                    f"🛒 **{name}** — ¡Mercado cerrado! Ya hay uno nuevo abierto.\n"
+                    f"{league_url(url_for('market', league_id=league_id))}"
+                )
             except Exception as exc:
                 lines.append(f"[{name}] market rotation FAILED: {exc}")
 
@@ -2435,6 +2476,10 @@ def run_daily_task():
                 ok, result = play_gameweek_for_league(db, league_id)
                 if ok:
                     lines.append(f"[{name}] gameweek {result} played OK")
+                    send_discord_message(
+                        f"⚽ **{name}** — ¡Jornada {result} jugada! Ya puedes ver los resultados.\n"
+                        f"{league_url(url_for('gameweek_detail', league_id=league_id, number=result))}"
+                    )
                 else:
                     lines.append(f"[{name}] gameweek NOT played: {result}")
             except Exception as exc:

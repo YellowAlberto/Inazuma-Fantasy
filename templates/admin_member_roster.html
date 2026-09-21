@@ -48,7 +48,10 @@
       {% endfor %}
     </div>
     {% else %}
-    <p class="empty-state" style="margin-top:16px;">Sin resultados para "{{ query }}" (o ya está en esta plantilla).</p>
+    <div class="empty-box" style="margin-top:16px;">
+      <div class="empty-box-icon">🔍</div>
+      <p>Sin resultados para "{{ query }}" (o ya está en esta plantilla).</p>
+    </div>
     {% endif %}
   {% endif %}
 </div>
@@ -79,7 +82,10 @@
   </div>
   {% endfor %}
   {% if not roster %}
-  <p class="empty-state">Este entrenador no tiene ningún jugador todavía.</p>
+  <div class="empty-box">
+    <div class="empty-box-icon">👤</div>
+    <p>Este entrenador no tiene ningún jugador todavía.</p>
+  </div>
   {% endif %}
 </div>
 {% endblock %}

@@ -37,7 +37,10 @@
       </tbody>
     </table>
     {% else %}
-    <p class="empty-state">Todavía no hay datos en esta categoría.</p>
+    <div class="empty-box">
+      <div class="empty-box-icon">📊</div>
+      <p>Todavía no hay datos en esta categoría.</p>
+    </div>
     {% endif %}
   </div>
   {% endfor %}
