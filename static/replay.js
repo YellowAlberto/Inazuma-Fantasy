@@ -268,6 +268,53 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     var badges = container.querySelectorAll('.pitch-mini-player');
 
+    // Admin-only debug log (see gameweek_detail.html — only rendered into
+    // the page at all when current_user.is_admin). Lets you check that what
+    // the animation draws actually matches what scoring.py decided: who
+    // passed to whom, who a ball was stolen/intercepted from, etc.
+    var debugLog = card ? card.querySelector('.admin-debug-log[data-fixture="' + fixtureKey + '"]') : null;
+
+    // Every event type that carries a second participant beyond the main
+    // "player" (a pass recipient, whoever lost the ball, the shooter a
+    // save/block stopped...) — kept as a lookup instead of an if/else chain
+    // so adding another one later is a one-line change.
+    var SECONDARY_PARTICIPANT_FIELDS = [
+      ['recipient', 'recipient_id', '→ recibe'],
+      ['from_player', 'from_id', '← se la quita a'],
+      ['against', 'against_id', '↔ contra'],
+      ['shooter', 'shooter_id', '← dispara'],
+    ];
+
+    function logDebugEvent(eventIndex, ev, badgeX, badgeY, ballTargetX, ballTargetY) {
+      if (!debugLog) return;
+      var parts = [
+        '#' + eventIndex,
+        "min " + ev.minute + "'",
+        ev.type,
+        '(' + (ev.side || '?') + ')',
+      ];
+      if (ev.player) parts.push(ev.player + (ev.player_id != null ? ' #' + ev.player_id : ''));
+      for (var i = 0; i < SECONDARY_PARTICIPANT_FIELDS.length; i++) {
+        var nameKey = SECONDARY_PARTICIPANT_FIELDS[i][0];
+        var idKey = SECONDARY_PARTICIPANT_FIELDS[i][1];
+        var label = SECONDARY_PARTICIPANT_FIELDS[i][2];
+        if (ev[nameKey]) {
+          parts.push(label + ' ' + ev[nameKey] + (ev[idKey] != null ? ' #' + ev[idKey] : ''));
+        }
+      }
+      if (ev.assist) parts.push('🅰️ asist. ' + ev.assist + (ev.assist_id != null ? ' #' + ev.assist_id : ''));
+      if (ev.super_technique) parts.push('✨ ' + (ev.technique_name || 'súper técnica'));
+      if (badgeX != null) {
+        parts.push('jugador→(' + badgeX.toFixed(1) + ',' + badgeY.toFixed(1) + ')');
+        parts.push('balón→(' + ballTargetX.toFixed(1) + ',' + ballTargetY.toFixed(1) + ')');
+      }
+      var line = document.createElement('div');
+      line.className = 'admin-debug-line';
+      line.textContent = parts.join('  ');
+      debugLog.appendChild(line);
+      debugLog.scrollTop = debugLog.scrollHeight;
+    }
+
     var idx = 0;
     var timer = null;
     var homeGoals = 0;
@@ -374,9 +421,10 @@ document.addEventListener('DOMContentLoaded', function () {
         rotuloBanner.classList.remove('rotulo-visible');
         rotuloBanner.style.display = 'none';
       }
+      if (debugLog) debugLog.innerHTML = '';
     }
 
-    function renderEvent(ev) {
+    function renderEvent(ev, eventIndex) {
       // Whoever was out on the ball (and their supporting teammates) return
       // to their formation spot as the new play develops.
       if (activeBadge) sendBadgeHome(activeBadge);
@@ -389,10 +437,11 @@ document.addEventListener('DOMContentLoaded', function () {
         var idealY = actionY(ev, badge);
         var x, y;
         var isGoalkeeperAction = badge.dataset.position === 'GK';
+        var BALL_CONTINUITY = 0.55;
         if (ev.type === 'save' || isGoalkeeperAction) {
-          // The goalkeeper is always right there in their own box — never
-          // dragged toward wherever the ball happened to be a moment ago,
-          // whatever they're doing (a save, a clearance, anything).
+          // The goalkeeper THEMSELF is always right there in their own box —
+          // never dragged toward wherever the ball happened to be a moment
+          // ago, whatever they're doing (a save, a clearance, anything).
           x = idealX;
           y = idealY;
         } else {
@@ -400,14 +449,30 @@ document.addEventListener('DOMContentLoaded', function () {
           // jumping straight there — keeps the ball's path feeling like one
           // continuous, flowing move even across the many buildup passes
           // that don't get their own visible event in between.
-          var BALL_CONTINUITY = 0.55;
           x = clampPct(lastBallX + (idealX - lastBallX) * BALL_CONTINUITY);
           y = clampPct(lastBallY + (idealY - lastBallY) * BALL_CONTINUITY);
         }
-        lastBallX = x;
-        lastBallY = y;
         moveBadgeTo(badge, x, y);
-        placeBall(x, y);
+
+        // The BALL still travels continuously from wherever it last was,
+        // even on a goalkeeper action — otherwise it can warp corner-to-
+        // corner in one beat (e.g. a turnover in the attacking third
+        // followed immediately by a save at the other end), which reads as
+        // a glitch rather than a shot actually crossing the pitch. The
+        // keeper's own badge above is still anchored to their box; only the
+        // ball's on-screen position gets this extra blend.
+        var ballX, ballY;
+        if (ev.type === 'save' || isGoalkeeperAction) {
+          ballX = clampPct(lastBallX + (x - lastBallX) * BALL_CONTINUITY);
+          ballY = clampPct(lastBallY + (y - lastBallY) * BALL_CONTINUITY);
+        } else {
+          ballX = x;
+          ballY = y;
+        }
+        lastBallX = ballX;
+        lastBallY = ballY;
+        placeBall(ballX, ballY);
+        logDebugEvent(eventIndex, ev, x, y, ballX, ballY);
         if (ev.type === 'goal' || ev.type === 'shot_off') {
           // The shooter stays put after striking it — only the ball
           // keeps traveling, arriving a beat later than the player
@@ -461,6 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
       } else {
         activeBadge = null;
+        logDebugEvent(eventIndex, ev, null, null, null, null);
       }
 
       function applyGoalEffectsAndCaption() {
@@ -558,7 +624,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       var ev = events[idx];
-      renderEvent(ev);
+      renderEvent(ev, idx);
       idx++;
 
       function continueToNext() {
@@ -609,6 +675,14 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     }
 
+    function startPlayback() {
+      var ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') ctx.resume();
+      if (idx >= events.length) resetView();
+      playBtn.textContent = '⏸️ Pausa';
+      timer = setTimeout(step, 300);
+    }
+
     playBtn.addEventListener('click', function () {
       var ctx = getAudioCtx();
       if (ctx && ctx.state === 'suspended') ctx.resume();
@@ -618,9 +692,7 @@ document.addEventListener('DOMContentLoaded', function () {
         playBtn.textContent = '▶️ Reproducir';
         return;
       }
-      if (idx >= events.length) resetView();
-      playBtn.textContent = '⏸️ Pausa';
-      timer = setTimeout(step, 300);
+      startPlayback();
     });
 
     if (muteBtn) {
@@ -637,5 +709,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     resetView();
+    // Autoplay as soon as the replay is on screen, instead of waiting for
+    // a click — the Reproducir/Reiniciar/mute buttons are still there for
+    // the person to pause, restart or mute whenever they want. Note:
+    // browsers block audio from starting without a prior user gesture, so
+    // the very first playthrough on a page may run silently until the
+    // person interacts with the page (clicking pause/play, muting, etc.)
+    // — playSoundFor()/getAudioCtx() already resume the audio context on
+    // that first click, same as before.
+    startPlayback();
   });
 });

@@ -489,7 +489,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     timeline.append((
                         minute,
                         f"🔑 Pase clave de {attacker['nombre']} para {recipient['nombre']} ({side['label']})",
-                        {"minute": minute, "type": "key_pass", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url")},
+                        {"minute": minute, "type": "key_pass", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url"), "recipient": recipient["nombre"], "recipient_id": recipient["id"]},
                     ))
 
         elif roll < 0.40:
@@ -518,7 +518,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 timeline.append((
                     minute,
                     f"🔑 Pase clave de {passer['nombre']} para {recipient['nombre']} ({side['label']})",
-                    {"minute": minute, "type": "key_pass", "side": side_key, "player": passer["nombre"], "player_id": passer["id"], "sprite_url": passer.get("sprite_url")},
+                    {"minute": minute, "type": "key_pass", "side": side_key, "player": passer["nombre"], "player_id": passer["id"], "sprite_url": passer.get("sprite_url"), "recipient": recipient["nombre"], "recipient_id": recipient["id"]},
                 ))
 
         elif roll < 0.60:
@@ -558,7 +558,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         timeline.append((
                             minute,
                             f"✨ ¡SÚPER TÉCNICA! {defender['nombre']} despliega {defender_technique} y le quita el balón a {attacker['nombre']} ({other['label']})",
-                            {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "super_technique": True, "technique_name": defender_technique},
+                            {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "super_technique": True, "technique_name": defender_technique, "from_player": attacker["nombre"], "from_id": attacker["id"]},
                         ))
                 elif attacker_technique:
                     # Guaranteed dribble: the attacker keeps the ball with flair.
@@ -566,7 +566,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     timeline.append((
                         minute,
                         f"✨ ¡SÚPER TÉCNICA! {attacker['nombre']} regatea a {defender['nombre']} con {attacker_technique} ({side['label']})",
-                        {"minute": minute, "type": "dribble", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url"), "super_technique": True, "technique_name": attacker_technique},
+                        {"minute": minute, "type": "dribble", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url"), "super_technique": True, "technique_name": attacker_technique, "against": defender["nombre"], "against_id": defender["id"]},
                     ))
                     continue
                 else:
@@ -590,7 +590,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                             timeline.append((
                                 minute,
                                 f"🛡️ Robo de balón de {defender['nombre']} ({other['label']})",
-                                {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
+                                {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "from_player": attacker["nombre"], "from_id": attacker["id"]},
                             ))
                     elif "Brecha" in other["affinities"] and random.random() < 0.35 * affinity_scale(other["affinities"]["Brecha"]):
                         # Brecha: even when the tackle itself fails, a sharp
@@ -603,7 +603,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                             timeline.append((
                                 minute,
                                 f"🧹 Despeje de {defender['nombre']} ({other['label']})",
-                                {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
+                                {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "against": attacker["nombre"], "against_id": attacker["id"]},
                             ))
             side["last_passer"] = None
 
@@ -627,7 +627,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     timeline.append((
                         minute,
                         f"🧹 Despeje de {defender['nombre']} ({other['label']})",
-                        {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
+                        {"minute": minute, "type": "clearance", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "against": attacker["nombre"], "against_id": attacker["id"]},
                     ))
                 if random.random() < CLEARANCE_RECOVERED_BY_OWN_TEAM_CHANCE:
                     # A teammate of the clearer actually gets to the loose ball.
@@ -668,7 +668,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     timeline.append((
                         minute,
                         f"🎯 Intercepción de {defender['nombre']} ({other['label']})",
-                        {"minute": minute, "type": "interception", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url")},
+                        {"minute": minute, "type": "interception", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "from_player": attacker["nombre"], "from_id": attacker["id"]},
                     ))
             side["last_passer"] = None
 
@@ -720,13 +720,13 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         timeline.append((
                             minute,
                             f"✨ ¡SÚPER TÉCNICA! {blocker['nombre']} bloquea el disparo con {block_technique} ({other['label']})",
-                            {"minute": minute, "type": "block", "side": other_key, "player": blocker["nombre"], "player_id": blocker["id"], "sprite_url": blocker.get("sprite_url"), "super_technique": True, "technique_name": block_technique},
+                            {"minute": minute, "type": "block", "side": other_key, "player": blocker["nombre"], "player_id": blocker["id"], "sprite_url": blocker.get("sprite_url"), "super_technique": True, "technique_name": block_technique, "shooter": attacker["nombre"], "shooter_id": attacker["id"]},
                         ))
                     else:
                         timeline.append((
                             minute,
                             f"🚧 Bloqueo de {blocker['nombre']} ({other['label']})",
-                            {"minute": minute, "type": "block", "side": other_key, "player": blocker["nombre"], "player_id": blocker["id"], "sprite_url": blocker.get("sprite_url")},
+                            {"minute": minute, "type": "block", "side": other_key, "player": blocker["nombre"], "player_id": blocker["id"], "sprite_url": blocker.get("sprite_url"), "shooter": attacker["nombre"], "shooter_id": attacker["id"]},
                         ))
                 side["last_passer"] = None
                 continue
@@ -826,13 +826,13 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     timeline.append((
                         minute,
                         f"✨ ¡SÚPER TÉCNICA! {gk['nombre']} detiene el disparo con {save_technique} ({other['label']})",
-                        {"minute": minute, "type": "save", "side": other_key, "player": gk["nombre"], "player_id": gk["id"], "sprite_url": gk.get("sprite_url"), "super_technique": True, "technique_name": save_technique},
+                        {"minute": minute, "type": "save", "side": other_key, "player": gk["nombre"], "player_id": gk["id"], "sprite_url": gk.get("sprite_url"), "super_technique": True, "technique_name": save_technique, "shooter": attacker["nombre"], "shooter_id": attacker["id"]},
                     ))
                 else:
                     timeline.append((
                         minute,
                         f"🧤 Parada de {gk['nombre']} ({other['label']})",
-                        {"minute": minute, "type": "save", "side": other_key, "player": gk["nombre"], "player_id": gk["id"], "sprite_url": gk.get("sprite_url")},
+                        {"minute": minute, "type": "save", "side": other_key, "player": gk["nombre"], "player_id": gk["id"], "sprite_url": gk.get("sprite_url"), "shooter": attacker["nombre"], "shooter_id": attacker["id"]},
                     ))
             else:
                 shift_momentum(other_key)

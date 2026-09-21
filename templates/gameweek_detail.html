@@ -88,6 +88,18 @@
   {% else %}
     <p class="muted">Partido sin ocasiones destacadas.</p>
   {% endif %}
+
+  {% if current_user.is_admin and f.events %}
+  <details class="admin-debug-details">
+    <summary>🛠️ [admin] Log de eventos en bruto</summary>
+    <p class="muted admin-debug-hint">
+      Cada línea es un evento tal cual lo decide <code>scoring.py</code>, en el mismo orden en que se anima.
+      "acción→balón" son las coordenadas (%) que calcula <code>replay.js</code> para el jugador y para el balón en ese
+      instante — compáralas con lo que ves en el campo para detectar cualquier desajuste.
+    </p>
+    <div class="admin-debug-log" data-fixture="fx{{ f.id }}"></div>
+  </details>
+  {% endif %}
 </div>
 {% endfor %}
 {% if not fixtures %}
