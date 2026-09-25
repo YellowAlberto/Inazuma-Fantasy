@@ -91,7 +91,25 @@ a:hover { text-decoration: underline; }
   text-decoration: none !important;
   text-shadow: 0 0 14px rgba(255, 210, 63, 0.35);
 }
-.navbar-links { display: flex; align-items: center; gap: 18px; }
+.navbar-links { display: flex; align-items: center; gap: 10px; }
+
+/* Enlaces principales del navbar: cada sección (Mis ligas / Draft / Admin)
+   es una píldora con su propio color, para que de un vistazo se note que
+   son modos de juego distintos y no una lista plana de páginas iguales. */
+.nav-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 999px;
+  font-family: var(--font-head); font-weight: 600; font-size: 0.88rem;
+  border: 1px solid transparent; transition: transform .15s, background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.nav-link:hover { text-decoration: none; transform: translateY(-1px); }
+.nav-link-leagues { background: rgba(63, 164, 255, 0.12); border-color: rgba(63, 164, 255, 0.35); color: var(--blue-accent); }
+.nav-link-leagues:hover, .nav-link-leagues.active { background: rgba(63, 164, 255, 0.24); border-color: var(--blue-accent); color: var(--text-light); }
+.nav-link-draft { background: rgba(255, 179, 0, 0.12); border-color: rgba(255, 179, 0, 0.35); color: #ffb300; }
+.nav-link-draft:hover, .nav-link-draft.active { background: rgba(255, 179, 0, 0.24); border-color: #ffb300; color: var(--text-light); }
+.nav-link-admin { background: rgba(255, 77, 94, 0.12); border-color: rgba(255, 77, 94, 0.35); color: var(--red); }
+.nav-link-admin:hover, .nav-link-admin.active { background: rgba(255, 77, 94, 0.24); border-color: var(--red); color: var(--text-light); }
 .navbar-toggle {
   display: none;
   background: transparent;
@@ -120,8 +138,12 @@ a:hover { text-decoration: underline; }
   .navbar-links.navbar-links-open { display: flex; }
   .navbar-links .btn { width: 100%; text-align: center; }
 }
-.navbar-user { color: var(--text-muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
-.navbar-user:hover { color: var(--text-light); }
+.navbar-user {
+  color: var(--text-muted); font-size: 0.9rem; display: inline-flex; align-items: center; gap: 6px;
+  text-decoration: none; padding: 6px 12px 6px 6px; border-radius: 999px; margin-left: 8px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid var(--navy-600);
+}
+.navbar-user:hover { color: var(--text-light); border-color: var(--yellow); text-decoration: none; }
 .navbar-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); }
 .standings-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; border: 1px solid var(--orange); vertical-align: middle; margin-right: 4px; }
 .profile-avatar-big {

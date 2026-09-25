@@ -15,10 +15,11 @@
     <a href="{{ url_for('index') }}" class="navbar-brand">⚡ Inazuma Fantasy</a>
     {% if current_user.id %}
     <button type="button" class="navbar-toggle" id="navbarToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navbarLinks">☰</button>
+    {% set path = request.path %}
     <nav class="navbar-links" id="navbarLinks">
-      <a href="{{ url_for('leagues') }}">Mis ligas</a>
-      <a href="{{ url_for('draft.index') }}">Draft</a>
-      {% if current_user.is_admin %}<a href="{{ url_for('admin_leagues') }}">🛠️ Admin</a>{% endif %}
+      <a href="{{ url_for('leagues') }}" class="nav-link nav-link-leagues{{ ' active' if path.startswith('/leagues') else '' }}">🏆 Mis ligas</a>
+      <a href="{{ url_for('draft.index') }}" class="nav-link nav-link-draft{{ ' active' if path.startswith('/draft') else '' }}">🎴 Draft</a>
+      {% if current_user.is_admin %}<a href="{{ url_for('admin_leagues') }}" class="nav-link nav-link-admin{{ ' active' if path.startswith('/admin') else '' }}">🛠️ Admin</a>{% endif %}
       <a href="{{ url_for('profile') }}" class="navbar-user">
         {% if current_user.avatar_url %}
           <img src="{{ current_user.avatar_url }}" alt="" class="navbar-avatar">
