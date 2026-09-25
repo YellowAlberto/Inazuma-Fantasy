@@ -124,6 +124,12 @@ BENCH_SIZE = 5          # suplentes (no suman a la puntuación, sirven para rota
 # Cada línea entre dos vecinos suma puntos de enlace:
 CHEM_SAME_TEAM = 2      # han compartido equipo
 CHEM_SAME_SAGA = 1      # misma saga (solo si no comparten equipo)
+# Los "ojeados" (jugadores sin equipo registrado, ~la mitad de la base de
+# datos) no pueden compartir equipo con nadie y quedaban en desventaja de
+# química frente a los que sí tienen club. Para compensarlo, se tratan como
+# si todos perteneciesen a un mismo equipo virtual entre ellos: dos jugadores
+# sin equipo dan el mismo +CHEM_SAME_TEAM que si hubiesen jugado juntos.
+SCOUT_TEAM = "__scouts__"
 CHEM_SAME_ELEMENT = 1   # misma afinidad (Fuego, Viento, Bosque, Montaña)
 CHEM_SAME_ARCHETYPE = 1 # mismo arquetipo (Justicia, Brecha, ...; "Unknown" no cuenta)
 # La química de un jugador (0-3) sale de sumar los puntos de todos sus enlaces:
@@ -334,8 +340,12 @@ def link_reasons(a, b):
     if a is None or b is None:
         return []
     out = []
-    shared = set(a["equipos"]) & set(b["equipos"])
-    if shared:
+    a_teams = a["equipos"] or [SCOUT_TEAM]
+    b_teams = b["equipos"] or [SCOUT_TEAM]
+    shared = set(a_teams) & set(b_teams)
+    if shared == {SCOUT_TEAM}:
+        out.append(("Ambos son ojeados (sin equipo)", CHEM_SAME_TEAM))
+    elif shared:
         out.append(("Equipo: " + sorted(shared)[0], CHEM_SAME_TEAM))
     elif a["saga"] == b["saga"]:
         out.append(("Saga: " + a["saga"], CHEM_SAME_SAGA))
