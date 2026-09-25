@@ -75,7 +75,7 @@ def build_draft_blueprint(get_db, login_required, is_admin_user):
         day = _today()
         row = db.execute("SELECT * FROM drafts WHERE user_id=? AND day=?", (session["user_id"], day)).fetchone()
         if row is None and create:
-            state = {"formation": None, "formation_options": game.formation_options(day),
+            state = {"formation": None, "formation_options": game.formation_options(day, session["user_id"]),
                      "picks": [None] * TOTAL_SLOTS, "opened": [], "offer": None, "manager": None, "manager_offer": None}
             db.execute("INSERT INTO drafts(user_id, day, state) VALUES (?,?,?)",
                        (session["user_id"], day, json.dumps(state)))
@@ -202,7 +202,7 @@ def build_draft_blueprint(get_db, login_required, is_admin_user):
             if state["offer"]["slot"] != slot:
                 return err("Termina de elegir en la posición que ya has abierto.")
         else:
-            state["offer"] = {"slot": slot, "options": game.slot_options(row["day"], state["formation"], slot, state["picks"])}
+            state["offer"] = {"slot": slot, "options": game.slot_options(row["day"], state["formation"], slot, state["picks"], session["user_id"])}
             state["opened"].append(slot)
             save_state(row, state)
         return jsonify(serialize(load_draft()))
@@ -276,7 +276,7 @@ def build_draft_blueprint(get_db, login_required, is_admin_user):
         if row["finished"] or not state["formation"] or state["manager"] or state.get("offer"):
             return err("No puedes elegir entrenador ahora.")
         if not state.get("manager_offer"):
-            state["manager_offer"] = game.manager_options(row["day"])
+            state["manager_offer"] = game.manager_options(row["day"], session["user_id"])
             save_state(row, state)
         return jsonify(serialize(load_draft()))
 

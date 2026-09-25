@@ -240,7 +240,8 @@ def get_db():
 
 
 # ---------------------------------------------------------------------------
-# Sorteo de opciones (determinista por día: todos ven las mismas opciones)
+# Sorteo de opciones (determinista por día y por jugador: cada persona tiene
+# sus propias opciones, pero siempre las mismas si recarga la página)
 # ---------------------------------------------------------------------------
 def _rng(*parts):
     seed = hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()
@@ -254,15 +255,16 @@ def slot_position(formation, slot_idx):
     return None
 
 
-def slot_options(day, formation, slot_idx, picks, n=5):
+def slot_options(day, formation, slot_idx, picks, user_seed, n=5):
     """5 opciones: casi siempre una élite (90+, con ELITE_GUARANTEE_CHANCE de
     probabilidad — no todos los sobres traen una), 1 compañero de equipo de
     un vecino, 1 de la saga de un vecino y el resto buenas. Determinista a
-    partir del día y de tus elecciones. Para los suplentes salen jugadores
-    de cualquier posición."""
+    partir del día, del jugador (user_seed) y de tus elecciones: cada persona
+    ve una combinación distinta, pero siempre la misma si recarga la página.
+    Para los suplentes salen jugadores de cualquier posición."""
     db = get_db()
     pos = slot_position(formation, slot_idx)
-    rng = _rng(day, formation, slot_idx)
+    rng = _rng(day, user_seed, formation, slot_idx)
     taken_names = {db.players[p]["nombre"] for p in picks if p}
     base_pool = db.pool[pos] if pos else sorted(pid for lst in db.pool.values() for pid in lst)
     pool = [pid for pid in base_pool if db.players[pid]["nombre"] not in taken_names]
@@ -307,9 +309,9 @@ def slot_options(day, formation, slot_idx, picks, n=5):
     return chosen
 
 
-def manager_options(day, n=4):
+def manager_options(day, user_seed, n=4):
     db = get_db()
-    rng = _rng(day, "manager")
+    rng = _rng(day, user_seed, "manager")
     pool = list(db.managers)
     rng.shuffle(pool)
     out, names = [], set()
@@ -322,8 +324,8 @@ def manager_options(day, n=4):
     return out
 
 
-def formation_options(day):
-    rng = _rng(day, "formations")
+def formation_options(day, user_seed):
+    rng = _rng(day, user_seed, "formations")
     names = list(FORMATIONS)
     rng.shuffle(names)
     return names[:3]
