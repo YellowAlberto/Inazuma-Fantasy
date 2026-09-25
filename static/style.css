@@ -1341,9 +1341,71 @@ a.card:hover, .league-card:hover {
 .player-points-table { font-size: 0.82rem; }
 .player-points-table th, .player-points-table td { padding: 4px 8px; }
 
-.value-chart-wrap { background: var(--navy-900); border-radius: 10px; padding: 8px; }
-.value-chart-svg { width: 100%; height: 90px; display: block; }
-.value-chart-labels { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; }
+/* Gráfica de evolución del valor de mercado
+   ------------------------------------------------------------------
+   Área rellena con rejilla y valores al lado. El color dice si el jugador
+   sube o baja, pero el dato no depende del color: la cifra de arriba lleva
+   siempre el signo y una flecha. */
+.value-chart-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.value-chart-current {
+  font-family: var(--font-head);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-light);
+}
+.value-chart-delta {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 2px 9px 2px 9px;
+  border: 1px solid currentColor;
+}
+.value-chart-delta.vc-up { color: var(--green); background: rgba(51, 192, 122, 0.12); }
+.value-chart-delta.vc-down { color: var(--red); background: rgba(255, 77, 94, 0.12); }
+.value-chart-delta.vc-flat { color: var(--blue-accent); background: rgba(63, 164, 255, 0.12); }
+
+.value-chart-wrap {
+  position: relative;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 3px 14px 3px 14px;
+  padding: 6px 4px 2px;
+}
+.value-chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
+/* Rejilla y ejes: líneas finas y continuas, un tono por encima del fondo, para
+   que no compitan con el dato. */
+.value-chart-svg .vc-grid { stroke: rgba(146, 174, 255, 0.16); stroke-width: 1; }
+.value-chart-svg .vc-axis-y {
+  fill: var(--text-muted); font-size: 9px; font-family: var(--font-body);
+  dominant-baseline: middle; font-variant-numeric: tabular-nums;
+}
+.value-chart-svg .vc-axis-x {
+  fill: var(--text-muted); font-size: 9px; font-family: var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+.value-chart-svg .vc-cross { stroke: rgba(255, 255, 255, 0.35); stroke-width: 1; }
+
+.vc-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  background: #0a1130;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px 10px 2px 10px;
+  padding: 5px 9px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-light);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 16px rgba(3, 6, 20, 0.6);
+  z-index: 2;
+}
+.vc-tooltip b { display: block; font-size: 0.66rem; font-weight: 600; color: var(--text-muted); }
 
 .pagination { display: flex; gap: 10px; justify-content: center; margin-top: 24px; }
 
