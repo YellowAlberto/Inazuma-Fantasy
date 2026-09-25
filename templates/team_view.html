@@ -69,7 +69,11 @@
       </div>
       <div class="player-card-body">
         <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-        <div class="player-meta">{{ position_labels[p.posicion] }} · {{ p.elemento }}</div>
+        <div class="player-meta">
+          {{ position_labels[p.posicion] }} ·
+          {% if p.elemento | element_icon %}<img src="{{ url_for('static', filename='icons/elements/' + (p.elemento | element_icon)) }}" alt="" class="element-icon">{% endif %}
+          {{ p.elemento | element_label }}
+        </div>
         {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
         {% if p.in_lineup %}<span class="player-archetype" style="background: var(--orange); color: #1a0d00;">Titular</span>{% endif %}
         <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>

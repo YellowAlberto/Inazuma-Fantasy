@@ -103,8 +103,19 @@
             return;
           }
           document.getElementById('player-detail-name').textContent = data.nombre;
-          document.getElementById('player-detail-meta').textContent =
-            data.posicion_label + ' · ' + data.elemento + (data.arquetipo ? ' · ' + data.arquetipo : '') + ' · ' + data.juego;
+          var metaEl = document.getElementById('player-detail-meta');
+          metaEl.textContent = '';
+          metaEl.appendChild(document.createTextNode(data.posicion_label + ' · '));
+          if (data.elemento_icon_url) {
+            var elIcon = document.createElement('img');
+            elIcon.src = data.elemento_icon_url;
+            elIcon.alt = '';
+            elIcon.className = 'element-icon';
+            metaEl.appendChild(elIcon);
+          }
+          metaEl.appendChild(document.createTextNode(
+            data.elemento + (data.arquetipo ? ' · ' + data.arquetipo : '') + ' · ' + data.juego
+          ));
           document.getElementById('player-detail-value').textContent = data.current_value_label;
           document.getElementById('player-detail-total-points').textContent = data.total_points;
 

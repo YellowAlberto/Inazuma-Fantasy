@@ -351,6 +351,45 @@ def build_draft_blueprint(get_db, login_required, is_admin_user):
             ORDER BY total DESC LIMIT 100""").fetchall()
         return jsonify(day=day, today=_today(), daily=daily_out, overall=[dict(r) for r in overall])
 
+    @bp.get("/api/team/<username>")
+    def api_team(username):
+        """Equipo terminado de otro jugador (para poder revisarlo desde el
+        ranking): por defecto su mejor día, o uno concreto con ?day=.
+        Público igual que el resto del ranking, no hace falta estar logueado."""
+        db = get_db()
+        user = db.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+        if not user:
+            return err("Ese jugador no existe.", 404)
+        day = request.args.get("day")
+        if day:
+            row = db.execute(
+                "SELECT * FROM drafts WHERE user_id=? AND day=? AND finished=1",
+                (user["id"], day),
+            ).fetchone()
+        else:
+            row = db.execute(
+                "SELECT * FROM drafts WHERE user_id=? AND finished=1 "
+                "ORDER BY score DESC, day DESC LIMIT 1",
+                (user["id"],),
+            ).fetchone()
+        if not row:
+            return err("Ese jugador no tiene ningún equipo terminado ese día.", 404)
+        state = get_state(row)
+        f = game.FORMATIONS[state["formation"]]
+        result = game.compute_score(state["formation"], state["picks"], state["manager"])
+        return jsonify(
+            username=username,
+            day=row["day"],
+            score=row["score"], rating=row["rating"], chem=row["chem"],
+            formation=state["formation"],
+            slots=[{"pos": s[0], "label": s[1], "x": s[2], "y": s[3]} for s in f["slots"]],
+            links=result["chemistry"]["links"],
+            picks=[card(p, f["slots"][i][0]) for i, p in enumerate(state["picks"][:11])],
+            bench=[card(p) for p in state["picks"][11:]],
+            player_chem=result["chemistry"]["per_player"],
+            manager=card(state["manager"]),
+        )
+
     @bp.get("/api/history")
     @login_required
     def api_history():

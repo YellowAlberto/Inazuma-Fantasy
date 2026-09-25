@@ -192,6 +192,7 @@
 .draft-page .opt-name { font-weight: 700; font-size: 1.05rem; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 6px; }
 .draft-page .tags { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
 .draft-page .tag { font-size: .72rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: rgba(0,0,0,.5); }
+.draft-page .element-icon { width: 13px; height: 13px; vertical-align: -2px; margin-right: 3px; border-radius: 3px; }
 .draft-page .el-Fire { color: #ff8a70; } .draft-page .el-Wind { color: #7fe3ff; } .draft-page .el-Forest { color: #7dff9e; } .draft-page .el-Mountain { color: #ffcf7a; }
 .draft-page .teams { font-size: .75rem; min-height: 1.2em; background: rgba(0,0,0,.35); padding: 2px 6px; border-radius: 6px; }
 .draft-page .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; width: 100%; background: rgba(0,0,0,.45); border-radius: 8px; padding: 5px; }
@@ -219,6 +220,11 @@
 .draft-page .rank-table th, .draft-page .rank-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); }
 .draft-page .rank-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
 .draft-page .rank-table tr.me { background: rgba(255, 179, 0, .12); }
+.draft-page .rank-table tbody tr { cursor: pointer; transition: background .12s; }
+.draft-page .rank-table tbody tr:hover { background: rgba(255, 255, 255, .06); }
+.draft-page .team-modal-box { max-width: 760px; }
+.draft-page .team-modal-box .scorebar { margin-bottom: 14px; }
+.draft-page .team-modal-box .pitch { margin: 0 auto; max-width: 640px; }
 .draft-page .rank-table .pts { font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-size: 24px; color: var(--accent); }
 .draft-page .rank-table .star img { width: 32px; height: 32px; object-fit: contain; vertical-align: middle; margin-right: 6px; }
 

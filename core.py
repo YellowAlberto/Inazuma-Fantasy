@@ -25,6 +25,25 @@ from scoring import SEASON_GROUPS, season_group_label, season_label_es
 # variable (same place as SECRET_KEY) — never hardcode it here.
 SCHEDULER_TOKEN = os.environ.get("SCHEDULER_TOKEN", "")
 
+# Afinidad elemental de un jugador (Fire/Wind/Forest/Mountain en los datos
+# originales). ELEMENT_ICON_FILE apunta a los iconos reales en
+# static/icons/elements/ (aportados por el usuario), para no depender de
+# emojis que se ven distinto según el dispositivo/fuente.
+ELEMENT_ES = {"Fire": "Fuego", "Wind": "Viento", "Forest": "Bosque", "Mountain": "Montaña"}
+ELEMENT_ICON_FILE = {"Fire": "fuego.png", "Wind": "viento.png", "Forest": "bosque.png", "Mountain": "montana.png"}
+
+
+def element_label(value):
+    """Filtro de plantilla: traduce el elemento al español (o lo deja tal
+    cual si no se reconoce)."""
+    return ELEMENT_ES.get(value, value or "")
+
+
+def element_icon(value):
+    """Filtro de plantilla: nombre de fichero del icono en
+    static/icons/elements/, o None si el elemento no tiene icono."""
+    return ELEMENT_ICON_FILE.get(value)
+
 
 class LeagueSlugConverter(BaseConverter):
     """URL converter for league routes: the URL carries the league's slug

@@ -30,6 +30,8 @@ from core import (
     LeagueSlugConverter,
     close_db,
     display_season_filter,
+    element_icon,
+    element_label,
     euromillions_filter,
     euros_filter,
     inject_user,
@@ -48,6 +50,8 @@ app.context_processor(inject_user)
 app.template_filter("display_season")(display_season_filter)
 app.template_filter("euros")(euros_filter)
 app.template_filter("euromillions")(euromillions_filter)
+app.template_filter("element_label")(element_label)
+app.template_filter("element_icon")(element_icon)
 
 from auth_routes import register_auth_routes
 from admin_routes import register_admin_routes

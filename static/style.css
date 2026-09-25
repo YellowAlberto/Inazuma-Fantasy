@@ -918,6 +918,7 @@ a.card:hover, .league-card:hover {
 .player-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .player-meta { font-size: 0.78rem; color: var(--text-muted); }
 .player-meta-small { font-size: 0.72rem; opacity: 0.8; }
+.element-icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 2px; border-radius: 3px; }
 .player-stats-row { display: flex; gap: 8px; margin-top: 6px; font-size: 0.75rem; flex-wrap: wrap; }
 .player-card form { padding: 0 8px 8px; }
 .player-card-empty {

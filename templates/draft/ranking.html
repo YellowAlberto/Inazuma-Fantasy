@@ -16,7 +16,35 @@
     <thead><tr><th>#</th><th>Jugador</th><th>Días</th><th>Mejor</th><th>Promedio</th><th>Total</th></tr></thead>
     <tbody></tbody>
   </table>
+  <p class="muted small center">Toca un jugador para ver el equipo que hizo.</p>
 </section>
+
+<div class="modal hidden" id="team-modal">
+  <div class="modal-stack">
+    <div class="modal-box team-modal-box">
+      <div class="modal-head">
+        <h2 id="tm-title">Equipo</h2>
+        <span class="muted small" id="tm-day"></span>
+      </div>
+      <div class="scorebar">
+        <div class="pill"><span>Media</span><strong id="tm-rating">0</strong></div>
+        <div class="pill chem"><span>Química</span><strong id="tm-chem">0/33</strong></div>
+        <div class="pill score"><span>Puntuación</span><strong id="tm-score">0</strong></div>
+        <div class="pill"><span>Entrenador</span><strong id="tm-manager">—</strong></div>
+      </div>
+      <div class="pitch" id="tm-pitch-wrap">
+        <div class="pitch-lines"><div class="half"></div><div class="circle"></div><div class="box top"></div><div class="box bottom"></div></div>
+        <svg id="links" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+        <div id="slots"></div>
+      </div>
+      <div class="bench-wrap">
+        <div class="bench-title">Suplentes</div>
+        <div id="tm-bench" class="bench"></div>
+      </div>
+    </div>
+    <button type="button" class="btn small" id="team-modal-close">Cerrar</button>
+  </div>
+</div>
 {% endblock %}
 {% block extra_scripts %}
 <script>
@@ -28,15 +56,16 @@ async function load(day) {
   const picker = document.getElementById('day-picker');
   picker.max = r.today; picker.value = r.day;
   document.querySelector('#daily-table tbody').innerHTML = r.daily.length ? r.daily.map((x, i) => `
-    <tr class="${x.username === me ? 'me' : ''}">
+    <tr class="${x.username === me ? 'me' : ''}" data-username="${esc(x.username)}" data-day="${r.day}">
       <td>${medal(i)}</td><td>${esc(x.username)}</td>
       <td class="star">${x.star ? `<img src="/static/sprites/${encodeURIComponent(x.star.sprite)}" onerror="this.style.visibility='hidden'">${esc(x.star.nombre)}` : ''}</td>
       <td>${esc(x.formation)}</td><td>${x.rating}</td><td>${x.chem}/33</td><td class="pts">${x.score}</td>
     </tr>`).join('') : '<tr><td colspan="7" class="muted center">Nadie ha jugado este día todavía.</td></tr>';
   document.querySelector('#overall-table tbody').innerHTML = r.overall.length ? r.overall.map((x, i) => `
-    <tr class="${x.username === me ? 'me' : ''}">
+    <tr class="${x.username === me ? 'me' : ''}" data-username="${esc(x.username)}">
       <td>${medal(i)}</td><td>${esc(x.username)}</td><td>${x.days}</td><td>${x.best}</td><td>${x.avg}</td><td class="pts">${x.total}</td>
     </tr>`).join('') : '<tr><td colspan="6" class="muted center">Sin partidas todavía.</td></tr>';
+  wireRowClicks();
 }
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
@@ -45,6 +74,61 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.getElementById('day-picker').classList.toggle('hidden', t.dataset.tab !== 'daily');
 });
 document.getElementById('day-picker').onchange = e => load(e.target.value);
+
+// ---------------------------------------------------------------- ver equipo de otro jugador
+const tier = ovr => ovr >= 90 ? 'legend' : ovr >= 84 ? 'gold' : ovr >= 78 ? 'silver' : 'bronze';
+const chemDots = c => `<span class="dots">${[0, 1, 2].map(i => `<i class="${i < c ? 'on' : ''}"></i>`).join('')}</span>`;
+function tmCard(p, label, style, chem) {
+  if (!p) return `<div class="slot empty" style="${style || ''}"><span>+</span><b>${esc(label)}</b></div>`;
+  const ovr = p.ovr_here ?? p.ovr;
+  return `<div class="slot card-mini ${tier(ovr)}" style="${style || ''}"
+            title="${esc(p.nombre)} · ${esc(p.posicion)}${p.equipos && p.equipos.length ? ' · ' + esc(p.equipos.join(', ')) : ''}">
+    <span class="ovr">${ovr}</span><span class="pos">${esc(label)}</span>
+    <img class="sprite" src="/static/sprites/${encodeURIComponent(p.sprite)}" alt="" loading="lazy" onerror="this.classList.add('noimg')">
+    <span class="name">${esc(p.apodo)}</span>
+    ${chem !== undefined ? chemDots(chem) : ''}
+  </div>`;
+}
+async function openTeam(username, day) {
+  const modal = document.getElementById('team-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('tm-title').textContent = `Equipo de ${username}`;
+  document.getElementById('tm-day').textContent = '';
+  document.getElementById('links').innerHTML = '';
+  document.getElementById('slots').innerHTML = '<p class="muted center">Cargando…</p>';
+  document.getElementById('tm-bench').innerHTML = '';
+  const url = `/draft/api/team/${encodeURIComponent(username)}` + (day ? `?day=${day}` : '');
+  const data = await fetch(url).then(r => r.json());
+  if (data.error) {
+    document.getElementById('slots').innerHTML = `<p class="muted center">${esc(data.error)}</p>`;
+    return;
+  }
+  document.getElementById('tm-day').textContent = data.day.split('-').reverse().join('/');
+  document.getElementById('tm-rating').textContent = data.rating;
+  document.getElementById('tm-chem').textContent = `${data.chem}/33`;
+  document.getElementById('tm-score').textContent = data.score;
+  document.getElementById('tm-manager').textContent = data.manager ? data.manager.apodo : '—';
+
+  const lvl = v => v >= 3 ? 'l3' : v === 2 ? 'l2' : v === 1 ? 'l1' : 'l0';
+  document.getElementById('links').innerHTML = data.links.map(l => {
+    const a = data.slots[l.a], b = data.slots[l.b];
+    return `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="${lvl(l.value)}"/>`;
+  }).join('');
+  document.getElementById('slots').innerHTML = data.slots.map((s, i) =>
+    tmCard(data.picks[i], s.label, `left:${s.x}%;top:${s.y}%`, data.player_chem[i])).join('');
+  document.getElementById('tm-bench').innerHTML = data.bench.map((p, k) =>
+    tmCard(p, p ? p.posicion : `SUP ${k + 1}`)).join('');
+}
+function wireRowClicks() {
+  document.querySelectorAll('#daily-table tbody tr[data-username], #overall-table tbody tr[data-username]').forEach(tr => {
+    tr.onclick = () => openTeam(tr.dataset.username, tr.dataset.day);
+  });
+}
+document.getElementById('team-modal-close').onclick = () => document.getElementById('team-modal').classList.add('hidden');
+document.getElementById('team-modal').addEventListener('click', e => {
+  if (e.target.id === 'team-modal') document.getElementById('team-modal').classList.add('hidden');
+});
+
 load();
 </script>
 {% endblock %}

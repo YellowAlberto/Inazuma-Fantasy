@@ -5,6 +5,8 @@ from flask import flash, jsonify, redirect, render_template, request, session, u
 
 from core import (
     ROTULOS_MANIFEST,
+    element_icon,
+    element_label,
     euros_to_points,
     format_euros,
     get_db,
@@ -194,7 +196,11 @@ def register_market_routes(app):
                 "nombre": player["nombre"],
                 "posicion": player["posicion"],
                 "posicion_label": POSITION_LABELS.get(player["posicion"], player["posicion"]),
-                "elemento": player["elemento"],
+                "elemento": element_label(player["elemento"]),
+                "elemento_icon_url": (
+                    url_for("static", filename=f"icons/elements/{element_icon(player['elemento'])}")
+                    if element_icon(player["elemento"]) else None
+                ),
                 "arquetipo": player["arquetipo"] if player["arquetipo"] != "Unknown" else None,
                 "sprite_url": player["sprite_url"],
                 "juego": season_label_es(season_group_label(player["juego"])),
