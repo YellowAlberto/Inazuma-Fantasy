@@ -33,20 +33,41 @@ normales — apenas hace falta JavaScript para tocar nada de esto.
 
 ```
 inazuma-fantasy-py/
-├── app.py              # Rutas de Flask (toda la lógica de la app)
-├── db.py                # Conexión SQLite + creación/siembra/migraciones de tablas
-├── scoring.py            # Motor de simulación de partidos, formaciones y puntuación
-├── daily_task.py          # Script para la rotación diaria del mercado y jornadas
+├── app.py                 # Punto de entrada: crea la app y engancha cada módulo de rutas
+├── core.py                 # Sesión, decoradores, filtros de plantilla, helpers genéricos
+├── league_engine.py         # Mercado, pujas CPU, simulación de jornadas, clasificaciones
+├── discord_notify.py        # Avisos por webhook de Discord
+├── auth_routes.py            # /register /login /logout /profile
+├── admin_routes.py           # /admin/leagues... (panel de administración)
+├── leagues_routes.py         # /leagues... (crear, unirse, detalle, borrar)
+├── market_routes.py          # /leagues/<id>/market... (mercado semanal)
+├── team_routes.py             # /leagues/<id>/team... (plantilla, cláusulas)
+├── gameweeks_routes.py        # /standings /leaderboards /gameweeks... y el avance semanal
+├── tasks_routes.py            # /tasks/run-daily y /deploy-webhook (sin interfaz, para el cron/GitHub)
+├── draft_bp.py               # Modo Draft diario (sobres estilo FUT)
+├── draft_game.py              # Motor del Draft (sobres, química, formaciones)
+├── db.py                   # Conexión SQLite + creación/siembra/migraciones de tablas
+├── scoring.py               # Motor de simulación de partidos, formaciones y puntuación
+├── daily_task.py             # Script para la rotación diaria del mercado y jornadas
 ├── requirements.txt
 ├── seed/
-│   └── players.json     # Datos de los 5145 personajes ya procesados
+│   └── players.json        # Datos de los 5145 personajes ya procesados
 ├── static/
 │   ├── style.css
-│   ├── team.js, replay.js # Campo interactivo y repetición animada de partidos
-│   ├── sprites/          # ~4929 imágenes de personajes (.png) — no va en git
-│   └── sounds/            # Sonidos opcionales para la repetición — no va en git
-└── templates/            # Plantillas HTML (Jinja2)
+│   ├── team.js, replay.js  # Campo interactivo y repetición animada de partidos
+│   ├── draft.css, draft.js  # Interfaz del modo Draft
+│   ├── sprites/             # ~4929 imágenes de personajes (.png) — no va en git
+│   └── sounds/               # Sonidos opcionales para la repetición — no va en git
+└── templates/               # Plantillas HTML (Jinja2)
 ```
+
+`app.py` solo crea la aplicación Flask y llama a `register_X_routes(app)` de cada
+módulo — cada uno registra sus vistas directamente sobre `app` (no usa
+Blueprint), así que todas las rutas se siguen llamando exactamente igual que
+antes (`register`, `login`, `market`, `team`, `gameweek_detail`...) y ningún
+`url_for()` de las plantillas ha tenido que cambiar. El modo Draft es la
+excepción: es lo bastante independiente como para vivir en su propio
+Blueprint (`draft_bp.py`), con sus rutas bajo `/draft/...`.
 
 ## Instalación (en tu ordenador)
 

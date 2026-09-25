@@ -164,6 +164,10 @@
 .draft-page .modal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .draft-page .modal-head h2 { font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-size: 36px; margin: 0 0 12px; letter-spacing: 2px; }
 .draft-page .modal-stack #peek-btn { flex-shrink: 0; }
+
+/* ---------- carta al hoverear (pitch / banquillo) ---------- */
+.draft-page .player-hover-card { position: fixed; z-index: 60; pointer-events: none; width: 200px; }
+.draft-page .player-hover-card .option { cursor: default; width: 100%; }
 .draft-page .peek-reopen {
   position: fixed; right: 20px; bottom: 20px; z-index: 55;
   box-shadow: 0 10px 26px rgba(0, 0, 0, .55); animation: deal .25s ease-out;

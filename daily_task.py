@@ -16,8 +16,9 @@ Meant to be run ONCE A DAY (e.g. via a PythonAnywhere "Scheduled task") at
 This script is completely independent of Flask's request/session handling,
 so it can run outside of a web request (that's the whole point of a cron
 job). It reuses the exact same core logic as the "Cerrar mercado" and
-"Jugar jornada" buttons in the web app, imported straight from app.py, so
-behaviour never drifts between the manual buttons and the automatic runs.
+"Jugar jornada" buttons in the web app (now living in league_engine.py /
+discord_notify.py / core.py instead of app.py directly), so behaviour never
+drifts between the manual buttons and the automatic runs.
 
 Manual test:  python3 daily_task.py
 """
@@ -29,17 +30,21 @@ try:
 except Exception:  # pragma: no cover - extremely unlikely on a modern Python
     MADRID_TZ = None
 
-from app import (
-    rotate_market_for_league,
-    play_gameweek_for_league,
-    send_discord_message,
-    format_market_sold_for_discord,
-    format_gameweek_results_for_discord,
-    DISCORD_COLOR_MARKET,
+from core import PYTHONANYWHERE_DOMAIN
+from discord_notify import (
     DISCORD_COLOR_GAMEWEEK,
-    PYTHONANYWHERE_DOMAIN,
+    DISCORD_COLOR_MARKET,
+    format_gameweek_results_for_discord,
+    format_market_sold_for_discord,
+    send_discord_message,
 )
-from db import get_connection
+from league_engine import play_gameweek_for_league, rotate_market_for_league
+from db import get_connection, init_db
+
+# Importing app.py used to run this as a side effect (it calls init_db() at
+# the bottom); now that this script imports the split-out modules directly
+# instead of app.py, it has to make sure the tables exist itself.
+init_db()
 
 
 def _league_url(path):

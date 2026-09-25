@@ -122,7 +122,48 @@ function miniCard(p, i, label, extra = '', style = '', tipExtra = '') {
   </button>`;
 }
 
+// ---------------------------------------------------------------- carta al hoverear
+function hoverCardHTML(p, i) {
+  const ovr = p.ovr_here ?? p.ovr;
+  const isBench = i >= 11;
+  return `<div class="option ${tier(ovr)}">
+    <div class="opt-top"><span class="ovr">${ovr}</span><span class="pos">${p.posicion}</span></div>
+    ${sprite(p)}
+    <div class="opt-name">${esc(p.nombre)}</div>
+    <div class="tags">
+      <span class="tag saga">${esc(p.saga)}</span>
+      ${p.arquetipo && p.arquetipo !== 'Unknown' ? `<span class="tag arq">${esc(p.arquetipo)}</span>` : ''}
+      ${p.elemento ? `<span class="tag el-${p.elemento}">${ELEMENTS[p.elemento] || p.elemento}</span>` : ''}
+    </div>
+    <div class="teams">${p.equipos.length ? esc(p.equipos.slice(0, 3).join(' · ')) : '<span class="muted">Sin equipo registrado</span>'}</div>
+    <div class="stats">${Object.keys(STAT_LABELS).map(k => `<div><span>${STAT_LABELS[k]}</span><b>${p.stats[k]}</b></div>`).join('')}</div>
+    <div class="chem-preview">${isBench ? 'Suplente' : `Química ${chemDots(S.player_chem[i])} ${S.player_chem[i]}/3`}</div>
+  </div>`;
+}
+
+function showHoverCard(el, p, i) {
+  const card = $('player-hover-card');
+  card.innerHTML = hoverCardHTML(p, i);
+  card.classList.remove('hidden');
+  const r = el.getBoundingClientRect();
+  const margin = 12;
+  const cw = card.offsetWidth, ch = card.offsetHeight;
+  let left = r.right + margin;
+  if (left + cw > window.innerWidth - 8) left = r.left - cw - margin;
+  if (left < 8) left = Math.min(window.innerWidth - cw - 8, Math.max(8, r.left));
+  let top = r.top;
+  if (top + ch > window.innerHeight - 8) top = window.innerHeight - ch - 8;
+  if (top < 8) top = 8;
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+}
+
+function hideHoverCard() {
+  $('player-hover-card').classList.add('hidden');
+}
+
 function renderPitch() {
+  hideHoverCard(); // los huecos se recrean; evita dejar una carta flotante con datos viejos
   const lvl = v => v >= 3 ? 'l3' : v === 2 ? 'l2' : v === 1 ? 'l1' : 'l0';
   $('links').innerHTML = S.links.map(l => {
     const a = S.slots[l.a], b = S.slots[l.b];
@@ -148,6 +189,7 @@ function renderPitch() {
     el.onclick = () => onSlot(i);
     el.ondragstart = e => {
       e.dataTransfer.setData('text/plain', i); el.classList.add('dragging');
+      hideHoverCard();
       if (pickAt(i)) {
         swapFrom = null; // si venías de un clic previo, manda el arrastre actual
         dragFromIndex = i; swapPreview = null; applySwapPreview(); loadSwapPreview(i);
@@ -167,6 +209,12 @@ function renderPitch() {
         render(await api('/api/swap', { a: from, b: i }));
       }
     };
+    el.addEventListener('mouseenter', () => {
+      if (dragFromIndex !== null) return; // no molestar mientras se arrastra otra carta
+      const p = pickAt(i);
+      if (p) showHoverCard(el, p, i);
+    });
+    el.addEventListener('mouseleave', hideHoverCard);
   });
   applySwapPreview();
   $('swap-hint').textContent = swapFrom === null
