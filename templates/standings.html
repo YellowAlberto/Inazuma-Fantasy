@@ -6,7 +6,7 @@
     <h1>Clasificación</h1>
     <p class="muted">{{ league.name }} · Jornada actual: {{ league.current_gameweek }}</p>
   </div>
-  <a href="{{ url_for('leaderboards', league_id=league.id) }}" class="btn btn-secondary">📊 Clasificaciones individuales</a>
+  <a href="{{ url_for('leaderboards', league_id=league.id) }}" class="btn btn-secondary">Clasificaciones individuales</a>
   <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
 </div>
 

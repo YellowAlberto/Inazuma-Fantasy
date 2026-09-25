@@ -49,7 +49,7 @@
     <p class="muted">{{ league.name }} · Gastado: {{ spent|euros }} / {{ league.budget|euros }}{{ ' + ' + bonus_budget|euros + ' de bono' if bonus_budget else '' }} · Restante: <strong>{{ remaining|euros }}</strong></p>
   </div>
   <div class="page-header-actions">
-    <a href="{{ url_for('market', league_id=league.id) }}" class="btn btn-primary">🛒 Ir al mercado</a>
+    <a href="{{ url_for('market', league_id=league.id) }}" class="btn btn-primary">Ir al mercado</a>
     <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
   </div>
 </div>
