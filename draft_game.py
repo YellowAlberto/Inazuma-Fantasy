@@ -101,6 +101,11 @@ FORMATIONS = {
 # OVR_CURVE > 1 hace que haya menos cartas altas (1.0 = reparto lineal).
 OVR_MIN, OVR_MAX, OVR_CURVE = 70, 99, 1.1
 
+# Probabilidad de que un sobre incluya una carta de 90+ ("élite"). Con 1.0
+# saldría siempre una (como antes); más bajo da sobres más variados, donde
+# a veces lo mejor que hay es un 88 o un 85.
+ELITE_GUARANTEE_CHANCE = 0.55
+
 # Penalización de media al jugar fuera de su posición natural
 _LINES = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
 POSITION_PENALTY = {}
@@ -244,9 +249,11 @@ def slot_position(formation, slot_idx):
 
 
 def slot_options(day, formation, slot_idx, picks, n=5):
-    """5 opciones: 1 élite, 1 compañero de equipo de un vecino, 1 de la saga de un
-    vecino y el resto buenas. Determinista a partir del día y de tus elecciones.
-    Para los suplentes salen jugadores de cualquier posición."""
+    """5 opciones: casi siempre una élite (90+, con ELITE_GUARANTEE_CHANCE de
+    probabilidad — no todos los sobres traen una), 1 compañero de equipo de
+    un vecino, 1 de la saga de un vecino y el resto buenas. Determinista a
+    partir del día y de tus elecciones. Para los suplentes salen jugadores
+    de cualquier posición."""
     db = get_db()
     pos = slot_position(formation, slot_idx)
     rng = _rng(day, formation, slot_idx)
@@ -283,7 +290,8 @@ def slot_options(day, formation, slot_idx, picks, n=5):
                 continue
             chosen.append(pid); names.add(nm); k -= 1
 
-    take(elite, 1)
+    if elite and rng.random() < ELITE_GUARANTEE_CHANCE:
+        take(elite, 1)
     take(mates, 1)
     take(saga_mates, 1)
     take(good, n - 1 - len(chosen))

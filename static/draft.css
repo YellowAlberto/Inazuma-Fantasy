@@ -162,6 +162,11 @@
 @keyframes pop { from  { transform: scale(.9); opacity: 0; } }
 .draft-page .modal-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .draft-page .modal-head h2 { font-family: 'Bebas Neue', Impact, 'Arial Narrow', sans-serif; font-size: 36px; margin: 0 0 12px; letter-spacing: 2px; }
+.draft-page .modal-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.draft-page .peek-reopen {
+  position: fixed; right: 20px; bottom: 20px; z-index: 55;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .55); animation: deal .25s ease-out;
+}
 .draft-page .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
 .draft-page .option {
   position: relative; font: inherit; color: var(--text); cursor: pointer; text-align: center;

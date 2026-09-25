@@ -92,7 +92,7 @@ function render(state) {
 
   if (state.offer) showOffer(state.offer);
   else if (state.manager_offer) showManagerOffer(state.manager_offer);
-  else $('modal').classList.add('hidden');
+  else { $('modal').classList.add('hidden'); $('peek-reopen-btn').classList.add('hidden'); }
 }
 
 function renderFormations() {
@@ -219,6 +219,7 @@ function showOffer(offer) {
   $('modal-title').textContent = offer.slot < 11 ? `Elige tu ${S.slots[offer.slot].label}` : `Elige tu suplente ${offer.slot - 10}`;
   $('options').innerHTML = offer.options.map(p => optionCard(p, false)).join('');
   $('modal').classList.remove('hidden');
+  $('peek-reopen-btn').classList.add('hidden');
   document.querySelectorAll('#options .option').forEach(el => el.onclick = async () =>
     render(await api(`/api/slot/${offer.slot}/pick`, { player_id: +el.dataset.id })));
 }
@@ -227,8 +228,23 @@ function showManagerOffer(offer) {
   $('modal-title').textContent = 'Elige tu entrenador';
   $('options').innerHTML = offer.options.map(p => optionCard(p, true)).join('');
   $('modal').classList.remove('hidden');
+  $('peek-reopen-btn').classList.add('hidden');
   document.querySelectorAll('#options .option').forEach(el => el.onclick = async () =>
     render(await api('/api/manager/pick', { player_id: +el.dataset.id })));
+}
+
+// ------------------------------------------------------------------ peek
+const peekBtn = $('peek-btn');
+const peekReopenBtn = $('peek-reopen-btn');
+if (peekBtn && peekReopenBtn) {
+  peekBtn.onclick = () => {
+    $('modal').classList.add('hidden');
+    peekReopenBtn.classList.remove('hidden');
+  };
+  peekReopenBtn.onclick = () => {
+    $('modal').classList.remove('hidden');
+    peekReopenBtn.classList.add('hidden');
+  };
 }
 
 // ---------------------------------------------------------------- finish

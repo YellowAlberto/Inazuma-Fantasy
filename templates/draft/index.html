@@ -70,11 +70,16 @@
   <div class="modal-box">
     <div class="modal-head">
       <h2 id="modal-title">Elige</h2>
-      <span class="muted small">La elección es definitiva</span>
+      <div class="modal-head-right">
+        <span class="muted small">La elección es definitiva</span>
+        <button type="button" class="btn small" id="peek-btn" title="Oculta esto un momento para revisar tu equipo">👁️ Ver mi equipo</button>
+      </div>
     </div>
     <div class="options" id="options"></div>
   </div>
 </div>
+
+<button type="button" class="btn primary peek-reopen hidden" id="peek-reopen-btn">👁️ Volver a la elección</button>
 
 <div class="modal hidden" id="result">
   <div class="modal-box result-box">
