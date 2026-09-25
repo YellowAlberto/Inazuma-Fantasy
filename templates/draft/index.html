@@ -1,0 +1,98 @@
+{% extends "draft/base.html" %}
+{% block title %}Draft diario · Inazuma Fantasy{% endblock %}
+{% block draft_content %}
+<div class="scorebar">
+  <div class="pill"><span>Día</span><strong id="day">—</strong></div>
+  <div class="pill"><span>Media</span><strong id="rating">0</strong></div>
+  <div class="pill chem"><span>Química</span><strong id="chem">0/33</strong></div>
+  <div class="pill score"><span>Puntuación</span><strong id="score">0</strong></div>
+  <div class="pill"><span>Próximo draft</span><strong id="countdown">--:--:--</strong></div>
+</div>
+
+{% if current_user.is_admin %}
+<div class="row center admin-tools">
+  <button id="admin-reset-btn" class="btn" title="Solo lo ves tú (admin): borra tu draft de hoy para poder volver a probarlo">🛠️ Reiniciar mi draft de hoy (admin)</button>
+</div>
+{% endif %}
+
+<section id="formation-step" class="hidden">
+  <h2 class="title">Elige la formación de hoy</h2>
+  <p class="muted center">Cada día hay 3 formaciones disponibles. Luego abre cada posición y elige 1 de 5 jugadores.</p>
+  <div id="formation-list" class="formation-list"></div>
+</section>
+
+<section id="draft-step" class="layout hidden">
+  <div class="pitch-col">
+    <div class="pitch" id="pitch">
+      <div class="pitch-lines"><div class="half"></div><div class="circle"></div><div class="box top"></div><div class="box bottom"></div></div>
+      <svg id="links" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+      <div id="slots"></div>
+    </div>
+    <p class="muted small center" id="swap-hint"></p>
+    <div class="bench-wrap">
+      <div class="bench-title">Suplentes <span class="muted small">· no suman puntos, sirven para rotar</span></div>
+      <div id="bench" class="bench"></div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="panel">
+      <h3>Entrenador</h3>
+      <div id="manager-slot"></div>
+    </div>
+    <div class="panel">
+      <h3>Química</h3>
+      <ul class="rules">
+        <li>Mismo equipo: <b>+2</b></li>
+        <li>Misma saga: <b>+1</b> <span class="muted small">(si no comparten equipo)</span></li>
+        <li>Misma afinidad (elemento): <b>+1</b></li>
+        <li>Mismo arquetipo: <b>+1</b></li>
+      </ul>
+      <p class="small legend-links">Líneas: <span><i class="lk l0"></i>0</span><span><i class="lk l1"></i>1</span><span><i class="lk l2"></i>2</span><span><i class="lk l3"></i>3+ pts</span></p>
+      <ul class="rules">
+        <li>Suma de sus enlaces: <b>2</b> pts → ●○○, <b>4</b> pts → ●●○, <b>6</b> pts → ●●●</li>
+        <li>Entrenador: <b>+1</b> a los jugadores de su saga</li>
+        <li>Máximo <b>3</b> por jugador (33 en total)</li>
+      </ul>
+      <p class="muted small">Pasa el ratón por los números de las líneas para ver por qué conectan.</p>
+      <p class="muted small">Puedes mover a un jugador a otra posición: pierde 3 de media por cada línea de distancia (DF↔MF −3, DF↔FW −6) y 25 si entra o sale de la portería. La media en rojo indica que está fuera de posición.</p>
+      <p class="muted small">Cada jugador rinde al 70% con 0 de química, al 80% con 1, al 90% con 2 y al 100% con 3. Puntuación = media efectiva × 10.</p>
+    </div>
+    <button id="finish-btn" class="btn primary big" disabled>Enviar equipo</button>
+    <div class="panel" id="history-panel">
+      <h3>Tus últimos días</h3>
+      <div id="history" class="muted small">—</div>
+    </div>
+  </aside>
+</section>
+
+<div class="modal hidden" id="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="modal-title">Elige</h2>
+      <span class="muted small">La elección es definitiva</span>
+    </div>
+    <div class="options" id="options"></div>
+  </div>
+</div>
+
+<div class="modal hidden" id="result">
+  <div class="modal-box result-box">
+    <h2>¡Equipo enviado!</h2>
+    <div class="big-score" id="res-score">0</div>
+    <div class="res-grid">
+      <div><span>Media</span><strong id="res-rating"></strong></div>
+      <div><span>Química</span><strong id="res-chem"></strong></div>
+      <div><span>Posición hoy</span><strong id="res-rank"></strong></div>
+    </div>
+    <p class="muted">Vuelve mañana para un nuevo draft.</p>
+    <div class="row center">
+      <a class="btn primary" href="{{ url_for('draft.ranking') }}">Ver ranking</a>
+      <button class="btn" onclick="document.getElementById('result').classList.add('hidden')">Ver mi equipo</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+{% endblock %}
+{% block extra_scripts %}<script src="{{ url_for('static', filename='draft.js') }}" defer></script>{% endblock %}

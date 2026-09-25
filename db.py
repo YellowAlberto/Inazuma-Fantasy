@@ -198,6 +198,20 @@ CREATE TABLE IF NOT EXISTS fixtures (
     home_formation TEXT NOT NULL DEFAULT '4-4-2',
     away_formation TEXT NOT NULL DEFAULT '4-4-2'
 );
+
+-- Modo Draft diario (sobres estilo FUT): un intento por usuario y día.
+CREATE TABLE IF NOT EXISTS drafts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    day TEXT NOT NULL,
+    state TEXT NOT NULL,
+    finished INTEGER NOT NULL DEFAULT 0,
+    score INTEGER,
+    rating REAL,
+    chem INTEGER,
+    finished_at TEXT,
+    UNIQUE(user_id, day)
+);
 """
 
 

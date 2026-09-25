@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='draft.css') }}">
+{% endblock %}
+{% block content %}
+<div class="draft-page">
+  <nav class="draft-subnav">
+    <a href="{{ url_for('draft.index') }}" class="draft-logo"><span class="bolt">⚡</span>INAZUMA<b>DRAFT</b></a>
+    <div class="draft-subnav-links">
+      <a href="{{ url_for('draft.index') }}">Draft diario</a>
+      <a href="{{ url_for('draft.ranking') }}">Ranking</a>
+    </div>
+  </nav>
+  {% block draft_content %}{% endblock %}
+</div>
+{% endblock %}

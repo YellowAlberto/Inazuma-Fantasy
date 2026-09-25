@@ -244,6 +244,11 @@ def login_required(view):
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "")
 
 
+def is_admin_user():
+    username = session.get("username", "")
+    return bool(ADMIN_USERNAME) and username.lower() == ADMIN_USERNAME.lower()
+
+
 def admin_required(view):
     @functools.wraps(view)
     def wrapped(*args, **kwargs):
@@ -2751,6 +2756,13 @@ def deploy_webhook():
 # database/tables exist even when a WSGI server (PythonAnywhere, gunicorn,
 # etc.) imports this module instead of running it as a script.
 init_db()
+
+# Modo Draft diario (sobres estilo FUT): vive en su propio módulo, pero
+# reutiliza las cuentas de usuario y la conexión a la base de datos de
+# arriba en vez de tener su propio login independiente.
+from draft_bp import build_draft_blueprint
+
+app.register_blueprint(build_draft_blueprint(get_db, login_required, is_admin_user))
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

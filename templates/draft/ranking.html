@@ -1,0 +1,50 @@
+{% extends "draft/base.html" %}
+{% block title %}Ranking Draft · Inazuma Fantasy{% endblock %}
+{% block draft_content %}
+<section class="ranking">
+  <h2 class="title">Ranking</h2>
+  <div class="tabs">
+    <button class="tab active" data-tab="daily">Hoy</button>
+    <button class="tab" data-tab="overall">Histórico</button>
+    <input type="date" id="day-picker">
+  </div>
+  <table class="rank-table" id="daily-table">
+    <thead><tr><th>#</th><th>Jugador</th><th>Estrella</th><th>Formación</th><th>Media</th><th>Química</th><th>Puntos</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <table class="rank-table hidden" id="overall-table">
+    <thead><tr><th>#</th><th>Jugador</th><th>Días</th><th>Mejor</th><th>Promedio</th><th>Total</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+const me = {{ (current_user.username or '')|tojson }};
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const medal = i => ['🥇','🥈','🥉'][i] || (i + 1);
+async function load(day) {
+  const r = await fetch('{{ url_for("draft.api_ranking") }}' + (day ? '?day=' + day : '')).then(r => r.json());
+  const picker = document.getElementById('day-picker');
+  picker.max = r.today; picker.value = r.day;
+  document.querySelector('#daily-table tbody').innerHTML = r.daily.length ? r.daily.map((x, i) => `
+    <tr class="${x.username === me ? 'me' : ''}">
+      <td>${medal(i)}</td><td>${esc(x.username)}</td>
+      <td class="star">${x.star ? `<img src="/static/sprites/${encodeURIComponent(x.star.sprite)}" onerror="this.style.visibility='hidden'">${esc(x.star.nombre)}` : ''}</td>
+      <td>${esc(x.formation)}</td><td>${x.rating}</td><td>${x.chem}/33</td><td class="pts">${x.score}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="muted center">Nadie ha jugado este día todavía.</td></tr>';
+  document.querySelector('#overall-table tbody').innerHTML = r.overall.length ? r.overall.map((x, i) => `
+    <tr class="${x.username === me ? 'me' : ''}">
+      <td>${medal(i)}</td><td>${esc(x.username)}</td><td>${x.days}</td><td>${x.best}</td><td>${x.avg}</td><td class="pts">${x.total}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="muted center">Sin partidas todavía.</td></tr>';
+}
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  document.getElementById('daily-table').classList.toggle('hidden', t.dataset.tab !== 'daily');
+  document.getElementById('overall-table').classList.toggle('hidden', t.dataset.tab !== 'overall');
+  document.getElementById('day-picker').classList.toggle('hidden', t.dataset.tab !== 'daily');
+});
+document.getElementById('day-picker').onchange = e => load(e.target.value);
+load();
+</script>
+{% endblock %}
