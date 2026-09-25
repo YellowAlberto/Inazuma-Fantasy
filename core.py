@@ -45,6 +45,44 @@ def element_icon(value):
     return ELEMENT_ICON_FILE.get(value)
 
 
+# Iconos de arquetipo (siluetas blancas aportadas por el usuario, en
+# static/icons/archetypes/). "Unknown" no tiene icono a propósito: no es un
+# arquetipo de verdad, sino la ausencia de dato.
+ARCHETYPE_ICON_FILE = {
+    "Justicia": "justicia.png",
+    "Contraataque": "contraataque.png",
+    "Juego Sucio": "juego_sucio.png",
+    "Tensión": "tension.png",
+    "Afinidad": "afinidad.png",
+    "Brecha": "brecha.png",
+}
+
+
+def archetype_icon(value):
+    """Filtro de plantilla: nombre de fichero del icono en
+    static/icons/archetypes/, o None si el arquetipo no tiene icono."""
+    return ARCHETYPE_ICON_FILE.get(value)
+
+
+# Escalones de "calidad" de una carta, sólo para el aspecto visual: el valor de
+# mercado es lo que ya mide lo bueno que es un jugador en la liga, así que la
+# carta se pinta de bronce/plata/oro/leyenda según ese valor. Los cortes están
+# puestos sobre la distribución real de la base de datos, de forma que las
+# leyendas sean ~3% de los personajes y el oro ~8%, y una parrilla de mercado
+# se lea de un vistazo en vez de ser 22 cajas iguales.
+CARD_TIERS = ((100, "leyenda"), (80, "oro"), (60, "plata"))
+
+
+def value_tier(points):
+    """Filtro de plantilla: 'bronce' | 'plata' | 'oro' | 'leyenda' a partir del
+    valor interno del jugador (en puntos, donde 10 puntos = 1M €)."""
+    value = points or 0
+    for threshold, name in CARD_TIERS:
+        if value >= threshold:
+            return name
+    return "bronce"
+
+
 class LeagueSlugConverter(BaseConverter):
     """URL converter for league routes: the URL carries the league's slug
     (e.g. 'inazuma-legends') instead of its raw numeric id, but every view

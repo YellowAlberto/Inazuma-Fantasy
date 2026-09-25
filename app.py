@@ -28,6 +28,7 @@ from flask import Flask
 from db import init_db
 from core import (
     LeagueSlugConverter,
+    archetype_icon,
     close_db,
     display_season_filter,
     element_icon,
@@ -35,6 +36,7 @@ from core import (
     euromillions_filter,
     euros_filter,
     inject_user,
+    value_tier,
 )
 
 app = Flask(__name__)
@@ -52,6 +54,8 @@ app.template_filter("euros")(euros_filter)
 app.template_filter("euromillions")(euromillions_filter)
 app.template_filter("element_label")(element_label)
 app.template_filter("element_icon")(element_icon)
+app.template_filter("archetype_icon")(archetype_icon)
+app.template_filter("value_tier")(value_tier)
 
 from auth_routes import register_auth_routes
 from admin_routes import register_admin_routes

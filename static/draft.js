@@ -7,6 +7,15 @@ const elementBadge = elemento => {
   const label = ELEMENTS[elemento] || elemento;
   return (icon ? `<img src="/static/icons/elements/${icon}" alt="" class="element-icon">` : '') + label;
 };
+// Iconos de arquetipo (mismos ficheros que usa el resto del sitio)
+const ARCHETYPE_ICONS = {
+  'Justicia': 'justicia.png', 'Contraataque': 'contraataque.png', 'Juego Sucio': 'juego_sucio.png',
+  'Tensión': 'tension.png', 'Afinidad': 'afinidad.png', 'Brecha': 'brecha.png',
+};
+const archetypeBadge = arquetipo => {
+  const icon = ARCHETYPE_ICONS[arquetipo];
+  return (icon ? `<img src="/static/icons/archetypes/${icon}" alt="" class="element-icon tag-icon-arch">` : '') + esc(arquetipo);
+};
 const STAT_LABELS = { potencia: 'POT', control: 'CON', tecnica: 'TEC', presion: 'PRE', fisico: 'FIS', agilidad: 'AGI', inteligencia: 'INT' };
 let S = null;          // estado actual
 let swapFrom = null;   // hueco seleccionado para intercambiar
@@ -138,7 +147,7 @@ function hoverCardHTML(p, i) {
     <div class="opt-name">${esc(p.nombre)}</div>
     <div class="tags">
       <span class="tag saga">${esc(p.saga)}</span>
-      ${p.arquetipo && p.arquetipo !== 'Unknown' ? `<span class="tag arq">${esc(p.arquetipo)}</span>` : ''}
+      ${p.arquetipo && p.arquetipo !== 'Unknown' ? `<span class="tag arq">${archetypeBadge(p.arquetipo)}</span>` : ''}
       ${p.elemento ? `<span class="tag el-${p.elemento}">${elementBadge(p.elemento)}</span>` : ''}
     </div>
     <div class="teams">${p.equipos.length ? esc(p.equipos.slice(0, 3).join(' · ')) : '<span class="muted">Sin equipo registrado</span>'}</div>
@@ -259,7 +268,7 @@ function optionCard(p, isManager) {
     <div class="opt-name">${esc(p.nombre)}</div>
     <div class="tags">
       <span class="tag saga">${esc(p.saga)}</span>
-      ${p.arquetipo && p.arquetipo !== 'Unknown' ? `<span class="tag arq">${esc(p.arquetipo)}</span>` : ''}
+      ${p.arquetipo && p.arquetipo !== 'Unknown' ? `<span class="tag arq">${archetypeBadge(p.arquetipo)}</span>` : ''}
       ${p.elemento ? `<span class="tag el-${p.elemento}">${elementBadge(p.elemento)}</span>` : ''}
     </div>
     <div class="teams">${p.equipos.length ? esc(p.equipos.slice(0, 3).join(' · ')) : '<span class="muted">Sin equipo registrado</span>'}</div>

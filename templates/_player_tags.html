@@ -1,0 +1,29 @@
+{# Bloque de etiquetas de una carta de jugador (afinidad y arquetipo).
+
+   Está en un macro compartido a propósito: el mercado, mi equipo y el equipo
+   de otro entrenador tienen que pintar exactamente lo mismo, porque si cada
+   plantilla lo escribe a su manera las cartas acaban con alturas distintas.
+
+   Son siempre DOS líneas, una por etiqueta, y siempre se pintan las dos
+   (aunque el personaje no tenga arquetipo) para que todas las cartas midan
+   igual y los datos queden alineados de una carta a otra. #}
+{% macro player_tags(p) -%}
+<div class="player-tags">
+  <span class="player-tag" title="Afinidad: {{ p.elemento | element_label }}">
+    {% if p.elemento | element_icon %}
+      <img src="{{ url_for('static', filename='icons/elements/' + (p.elemento | element_icon)) }}" alt="" class="tag-icon">
+    {% endif %}
+    {{ p.elemento | element_label or '—' }}
+  </span>
+  {% if p.arquetipo and p.arquetipo != 'Unknown' %}
+    <span class="player-tag player-tag-arch" title="Arquetipo: {{ p.arquetipo }}">
+      {% if p.arquetipo | archetype_icon %}
+        <img src="{{ url_for('static', filename='icons/archetypes/' + (p.arquetipo | archetype_icon)) }}" alt="" class="tag-icon tag-icon-arch">
+      {% endif %}
+      {{ p.arquetipo }}
+    </span>
+  {% else %}
+    <span class="player-tag player-tag-empty">Sin arquetipo</span>
+  {% endif %}
+</div>
+{%- endmacro %}

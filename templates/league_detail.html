@@ -4,9 +4,13 @@
 <div class="page-header">
   <div>
     <h1>{{ league.name }}</h1>
-    <p class="muted">Código de invitación: <strong>{{ league.invite_code }}</strong> · Presupuesto {{ league.budget|euros }} · Jornada {{ league.current_gameweek }}</p>
-    <p class="muted">Temporadas: {{ seasons_label }}</p>
-    <p class="muted">Scouts: {{ {"all": "Todos los personajes", "exclude": "Sin scouts", "only": "Solo scouts"}.get(league.scout_filter, "Todos los personajes") }}</p>
+    <div class="meta-chips">
+      <span class="meta-chip meta-chip-code">Código <strong>{{ league.invite_code }}</strong></span>
+      <span class="meta-chip">Presupuesto <strong>{{ league.budget|euros }}</strong></span>
+      <span class="meta-chip">Jornada <strong>{{ league.current_gameweek }}</strong></span>
+      <span class="meta-chip">Temporadas <strong>{{ seasons_label }}</strong></span>
+      <span class="meta-chip">Scouts <strong>{{ {"all": "Todos", "exclude": "Sin scouts", "only": "Solo scouts"}.get(league.scout_filter, "Todos") }}</strong></span>
+    </div>
     {% if league.ended %}
     <p class="muted" style="color: var(--orange);">🏆 Liga finalizada · Campeón: {% if champion and champion.avatar_sprite_url %}<img src="{{ champion.avatar_sprite_url }}" alt="" class="standings-avatar">{% endif %} <strong>{{ champion.team_name if champion else '—' }}</strong></p>
     {% endif %}

@@ -8,9 +8,10 @@
 
 :root {
   /* Blue base tones (replaces the old plain navy) */
-  --navy-900: #060c22;
-  --navy-800: #0e1740;
-  --navy-700: #172259;
+  --navy-900: #050a1e;
+  --navy-850: #080f2c;
+  --navy-800: #0d1638;
+  --navy-700: #15204f;
   --navy-600: #24337d;
   /* Inazuma trio: yellow, orange, blue */
   --yellow: #ffd23f;
@@ -26,6 +27,20 @@
   --font-head: 'Rubik', sans-serif;
   --font-title: 'Reggae', 'Rubik', sans-serif;
   --font-body: 'Inter', sans-serif;
+
+  /* Superficies: tres niveles de profundidad en vez de "todo azul marino
+     igual", que era lo que hacía que la interfaz se viese plana y genérica. */
+  --panel: linear-gradient(158deg, rgba(38, 56, 126, 0.85) 0%, rgba(13, 22, 56, 0.95) 58%, rgba(8, 14, 38, 0.97) 100%);
+  --panel-flat: #101a44;
+  --sunken: rgba(3, 6, 20, 0.55);
+  --line: rgba(146, 174, 255, 0.16);
+  --line-strong: rgba(146, 174, 255, 0.3);
+
+  /* Escalones de calidad de las cartas de jugador (estilo cromo) */
+  --tier-bronze: #c98a4b;
+  --tier-silver: #c6d3ea;
+  --tier-gold: #ffc93c;
+  --tier-legend: #b06bff;
 }
 
 * { box-sizing: border-box; }
@@ -33,15 +48,19 @@
 body {
   margin: 0;
   font-family: var(--font-body);
+  /* Capas, de arriba abajo: trama diagonal fina (da textura y quita el aspecto
+     de "fondo plano de plantilla"), dos focos de estadio, el degradado azul y
+     por último la imagen de portada muy atenuada como ambiente. */
   background:
-    radial-gradient(circle at 15% 0%, rgba(255, 210, 63, 0.18), transparent 45%),
-    radial-gradient(circle at 85% 8%, rgba(255, 122, 26, 0.2), transparent 50%),
-    linear-gradient(165deg, rgba(23, 34, 89, 0.88) 0%, rgba(6, 12, 34, 0.94) 55%, rgba(5, 8, 21, 0.97) 100%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.018) 0 2px, transparent 2px 7px),
+    radial-gradient(ellipse 70% 45% at 12% -5%, rgba(255, 210, 63, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 45% at 88% 2%, rgba(255, 122, 26, 0.16), transparent 70%),
+    linear-gradient(168deg, rgba(21, 32, 79, 0.9) 0%, rgba(8, 14, 40, 0.95) 45%, rgba(4, 7, 22, 0.985) 100%),
     url('img/hero-bg.webp');
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
-  background-position: top, top, top, top center;
-  background-size: auto, auto, auto, cover;
-  background-attachment: fixed, fixed, fixed, fixed;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-position: top left, top, top, top, top center;
+  background-size: auto, auto, auto, auto, cover;
+  background-attachment: fixed, fixed, fixed, fixed, fixed;
   color: var(--text-light);
   min-height: 100vh;
 }
@@ -49,6 +68,25 @@ body {
 h1, h2, h3 {
   font-family: var(--font-head);
   margin: 0 0 8px;
+  letter-spacing: -0.015em;
+}
+h1 { font-weight: 800; font-size: 2.1rem; line-height: 1.1; }
+h2 { font-weight: 700; }
+
+/* Título de página: una barra de "energía" vertical a la izquierda en vez de
+   un texto suelto, para que cada pantalla tenga un arranque claro. */
+.page-header h1 {
+  position: relative;
+  padding-left: 18px;
+}
+.page-header h1::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0.12em; bottom: 0.12em;
+  width: 6px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, var(--yellow), var(--orange) 55%, var(--blue-accent));
+  box-shadow: 0 0 14px rgba(255, 170, 40, 0.55);
 }
 /* The Reggae display font has no á/é/í/ó/ú/ñ/¿/¡ glyphs, so it's only safe on the
    static "Inazuma Fantasy" brand title (no accents) — not on h1/h2 in general,
@@ -73,14 +111,15 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 32px;
-  background: rgba(6, 12, 34, 0.88);
+  padding: 14px 32px;
+  background: linear-gradient(180deg, rgba(10, 17, 48, 0.94), rgba(5, 10, 30, 0.88));
   border-bottom: 3px solid transparent;
-  border-image: linear-gradient(90deg, var(--yellow), var(--orange), var(--blue-accent)) 1;
+  border-image: linear-gradient(90deg, var(--yellow), var(--orange) 35%, var(--blue-accent) 70%, rgba(63, 164, 255, 0)) 1;
   position: sticky;
   top: 0;
   z-index: 10;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 22px rgba(3, 6, 20, 0.5);
 }
 .navbar-brand {
   font-family: var(--font-title);
@@ -122,8 +161,18 @@ a:hover { text-decoration: underline; }
   cursor: pointer;
 }
 .navbar-toggle:hover { border-color: var(--orange); color: var(--orange); }
+/* Entre tablet y escritorio la barra se quedaba sin sitio y el nombre de la
+   marca se partía en dos líneas: ahí se encoge todo un poco antes de llegar
+   al menú desplegable de móvil. */
+@media (max-width: 1040px) {
+  .navbar { padding: 12px 18px; }
+  .navbar-brand { font-size: 1.25rem; }
+  .nav-link { padding: 7px 11px; font-size: 0.82rem; }
+  .navbar-user { font-size: 0.82rem; padding: 5px 10px 5px 5px; max-width: 130px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+}
 @media (max-width: 700px) {
   .navbar { flex-wrap: wrap; }
+  .navbar-user { max-width: none; }
   .navbar-toggle { display: inline-flex; align-items: center; justify-content: center; }
   .navbar-links {
     display: none;
@@ -188,19 +237,28 @@ a:hover { text-decoration: underline; }
 }
 
 .page-wrap { max-width: 1200px; margin: 0 auto; padding: 24px 32px 80px; }
+/* En el móvil los 32px de margen a cada lado se comían un tercio de la
+   pantalla, así que ahí el contenido va casi a borde. */
+@media (max-width: 700px) {
+  .page-wrap { padding: 18px 14px 60px; }
+  h1 { font-size: 1.65rem; }
+}
 
 /* Buttons */
 .btn {
   display: inline-block;
-  font-family: var(--font-body);
+  font-family: var(--font-head);
   font-weight: 700;
-  font-size: 0.9rem;
-  padding: 10px 18px;
-  border-radius: 10px;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  padding: 10px 20px;
+  /* misma esquina asimétrica que las tarjetas, para que todo el sistema
+     comparta una geometría reconocible */
+  border-radius: 3px 12px 3px 12px;
   border: none;
   cursor: pointer;
   text-decoration: none !important;
-  transition: transform 0.1s ease, opacity 0.1s ease, box-shadow 0.1s ease;
+  transition: transform 0.1s ease, opacity 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
 }
 .btn:active { transform: translateY(2px); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -241,52 +299,55 @@ a:hover { text-decoration: underline; }
 }
 @keyframes btn-spin { to { transform: rotate(360deg); } }
 
-/* Cards & layout ("cajitas") */
+/* Cards & layout ("cajitas")
+   Geometría asimétrica (esquinas distintas arriba-izquierda y abajo-derecha)
+   en vez del rectángulo redondeado de siempre: es el detalle que más hace que
+   deje de parecer una plantilla genérica. Encima, un filo superior de color
+   que se desvanece y un canto luminoso a la izquierda. */
 .card {
   position: relative;
-  background: linear-gradient(165deg, var(--navy-700) 0%, var(--navy-800) 100%);
-  border: 1px solid var(--navy-600);
-  border-top: 2px solid rgba(255, 210, 63, 0.5);
-  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px 18px 3px 18px;
   padding: 20px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3), 0 10px 24px rgba(4, 8, 24, 0.45);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 0 rgba(0, 0, 0, 0.35),
+    0 12px 28px rgba(3, 6, 20, 0.5);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
-.card:hover {
-  border-color: var(--orange);
-}
-a.card:hover, .league-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3), 0 14px 28px rgba(4, 8, 24, 0.5);
-}
-
-/* Inazuma bolt flourish on hover, top-left and bottom-right corners */
-.card::before, .card::after,
-.modal-box::before, .modal-box::after {
-  content: "⚡";
+/* filo superior: degradado que se apaga hacia la derecha.
+   (Sin overflow:hidden en .card, porque eso rompería las cabeceras de tabla
+   pegajosas y cualquier menú que se salga de la caja.) */
+.card::before {
+  content: "";
   position: absolute;
-  font-size: 1.6rem;
-  line-height: 1;
-  color: var(--yellow);
-  filter: drop-shadow(0 0 6px rgba(255, 210, 63, 0.9)) drop-shadow(0 0 12px rgba(255, 122, 26, 0.6));
-  opacity: 0;
-  transform: scale(0.4) rotate(-18deg);
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 3px 18px 0 0;
+  background: linear-gradient(90deg, var(--yellow) 0%, var(--orange) 26%, rgba(63, 164, 255, 0.5) 60%, transparent 100%);
+  opacity: 0.85;
   pointer-events: none;
-  z-index: 5;
 }
-.card::before, .modal-box::before { top: -12px; left: -12px; }
-.card::after, .modal-box::after {
-  bottom: -12px; right: -12px;
-  transform: scale(0.4) rotate(162deg);
+/* brillo de esquina, muy tenue, para que la superficie no sea un plano liso */
+.card::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0;
+  width: 55%; height: 70%;
+  max-height: 220px;
+  background: radial-gradient(ellipse at 85% 0%, rgba(120, 160, 255, 0.11), transparent 70%);
+  pointer-events: none;
 }
-.card:hover::before {
-  opacity: 1;
-  transform: scale(1) rotate(-18deg);
-}
-.card:hover::after {
-  opacity: 1;
-  transform: scale(1) rotate(162deg);
+.card:hover { border-color: var(--line-strong); }
+a.card:hover, .league-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 170, 40, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    0 18px 34px rgba(3, 6, 20, 0.55),
+    0 0 0 1px rgba(255, 170, 40, 0.18);
 }
 .page-header {
   display: flex;
@@ -298,31 +359,68 @@ a.card:hover, .league-card:hover {
 }
 .page-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
+/* Fichas de datos bajo el título de una página (código de liga, presupuesto,
+   jornada...). Antes eran párrafos sueltos apilados, que ocupaban mucho y no
+   se distinguían del texto normal. */
+.meta-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.meta-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 5px 11px;
+  border-radius: 2px 10px 2px 10px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+.meta-chip strong {
+  font-size: 0.85rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-light);
+}
+.meta-chip-code { border-color: rgba(255, 122, 26, 0.38); }
+.meta-chip-code strong { color: var(--orange); font-family: 'SFMono-Regular', Consolas, monospace; letter-spacing: 0.08em; }
+
 .budget-summary { margin-bottom: 20px; }
 .budget-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
 }
+/* Marcador de presupuesto: cifras grandes y tabulares, como un marcador de
+   estadio, con la etiqueta pequeña encima. */
 .budget-tile {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(4, 8, 24, 0.35);
-  border: 1px solid var(--navy-600);
+  border-radius: 2px 12px 2px 12px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
 }
 .budget-tile-label {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.07em;
 }
-.budget-tile-value { font-size: 1.3rem; font-weight: 800; color: var(--text-light); }
+.budget-tile-value {
+  font-family: var(--font-head);
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-light);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.budget-tile-spent { border-left-color: var(--blue-accent); }
+.budget-tile-committed { border-left-color: var(--yellow); }
 .budget-tile-spent .budget-tile-value { color: var(--blue-accent); }
 .budget-tile-committed .budget-tile-value { color: var(--yellow); }
-.budget-tile-available { border-color: var(--green); }
+.budget-tile-available { border-color: rgba(51, 192, 122, 0.45); border-left-color: var(--green); background: linear-gradient(120deg, rgba(51, 192, 122, 0.1), var(--sunken) 60%); }
 .budget-tile-available .budget-tile-value { color: var(--green); }
 .budget-bar {
   display: flex;
@@ -342,20 +440,60 @@ a.card:hover, .league-card:hover {
   .budget-tile-value { font-size: 1.1rem; }
 }
 
-.section-title { margin-top: 32px; }
+/* Encabezado de sección: en mayúsculas, con un "rayo" dibujado en CSS y una
+   línea que se desvanece a la derecha. Antes eran sólo palabras en negrita,
+   que es justo lo que hacía que las páginas pareciesen una plantilla vacía. */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 36px 0 14px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-light);
+}
+.section-title::before {
+  content: "";
+  flex-shrink: 0;
+  width: 13px;
+  height: 20px;
+  background: linear-gradient(180deg, var(--yellow), var(--orange));
+  /* silueta de rayo */
+  clip-path: polygon(58% 0, 8% 56%, 42% 56%, 30% 100%, 92% 40%, 54% 40%);
+  filter: drop-shadow(0 0 6px rgba(255, 190, 60, 0.6));
+}
+.section-title::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--line-strong), transparent);
+}
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
 
-.form-card label { display: block; margin: 10px 0 4px; font-size: 0.85rem; color: var(--text-muted); }
+.form-card label { display: block; margin: 10px 0 4px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
 .form-card input, .form-card select,
 .filter-bar input, .filter-bar select {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--navy-600);
-  background: var(--navy-900);
+  border-radius: 3px 12px 3px 12px;
+  border: 1px solid var(--line);
+  background: var(--sunken);
   color: var(--text-light);
   font-size: 0.95rem;
+}
+/* Un foco visible y con el amarillo de la marca, igual en todos los campos
+   del sitio (antes cada formulario tenía el suyo o ninguno). */
+.form-card input:focus, .form-card select:focus,
+.filter-bar input:focus, .filter-bar select:focus,
+.auth-card input:focus, .avatar-picker-filters input:focus,
+.avatar-picker-filters select:focus, .clause-form input:focus {
+  outline: none;
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.16);
 }
 .form-card button { margin-top: 14px; }
 
@@ -389,13 +527,16 @@ a.card:hover, .league-card:hover {
 .bid-form { display: flex; gap: 6px; }
 .bid-form input {
   flex: 1;
+  min-width: 0;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--navy-600);
-  background: var(--navy-900);
+  border-radius: 3px 10px 3px 10px;
+  border: 1px solid var(--line);
+  background: var(--sunken);
   color: var(--text-light);
   font-size: 0.9rem;
+  font-weight: 700;
 }
+.bid-form input:focus { outline: none; border-color: var(--yellow); box-shadow: 0 0 0 2px rgba(255, 210, 63, 0.18); }
 .bid-form button { flex-shrink: 0; }
 
 /* Formation picker */
@@ -409,7 +550,16 @@ a.card:hover, .league-card:hover {
   border-top: 1px dashed var(--navy-600);
   font-size: 0.8rem !important;
 }
-.player-card-starter { border-color: var(--orange); box-shadow: 0 0 0 1px var(--orange) inset; }
+/* Un titular lleva un galón verde arriba a la derecha, que se lee mejor que
+   un simple borde naranja (que además chocaba con el color del escalón). */
+.player-card-starter { box-shadow: 0 0 0 1px rgba(51, 192, 122, 0.55) inset, 0 2px 0 rgba(0, 0, 0, 0.35), 0 10px 20px rgba(3, 6, 20, 0.45); }
+.player-card-starter .player-card-top::after {
+  content: "TITULAR";
+  font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em;
+  color: #0a2a1a; background: var(--green);
+  padding: 2px 5px; border-radius: 3px;
+  align-self: center;
+}
 .player-card form { display: flex; flex-direction: column; gap: 6px; }
 
 /* Hover popup with per-gameweek points history (team page) */
@@ -455,14 +605,31 @@ a.card:hover, .league-card:hover {
 .danger-zone { border-color: var(--red); }
 .danger-zone h3 { color: var(--red); }
 
-/* Fixtures (1v1 matches) */
-.fixture-card { margin-bottom: 14px; }
+/* Fixtures (1v1 matches)
+   El marcador se presenta como el de un partido de verdad: banda propia,
+   nombres a los lados y el resultado en el centro sobre fondo oscuro. */
+.fixture-card { margin-bottom: 16px; }
 .fixture-score {
-  display: flex; align-items: center; justify-content: center; gap: 16px;
-  font-family: var(--font-head); font-weight: 700; font-size: 1.1rem; margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: var(--font-head); font-weight: 700; font-size: 1.05rem;
+  margin: -20px -20px 12px;
+  padding: 14px 20px;
+  background: linear-gradient(180deg, rgba(3, 6, 20, 0.55), rgba(3, 6, 20, 0.2));
+  border-bottom: 1px solid var(--line);
+  border-radius: 3px 18px 0 0;
 }
 .fixture-team { flex: 1; text-align: center; }
-.fixture-goals { color: var(--orange); font-size: 1.4rem; white-space: nowrap; }
+.fixture-goals {
+  color: var(--yellow);
+  font-size: 1.5rem;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 16px;
+  border-radius: 2px 12px 2px 12px;
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  text-shadow: 0 0 16px rgba(255, 210, 63, 0.4);
+}
 .match-summary { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
 .match-summary-line { margin: 0; font-size: 0.85rem; color: var(--text-light); }
 
@@ -471,10 +638,54 @@ a.card:hover, .league-card:hover {
 .standings-table th:nth-child(2), .standings-table td:nth-child(2),
 .standings-table th:nth-child(3), .standings-table td:nth-child(3) { text-align: left; }
 
-/* Archetype/affinity badge on player cards */
+/* Etiquetas de afinidad y arquetipo de una carta
+   ------------------------------------------------------------------
+   Siempre dos filas de una sola línea cada una. Antes la línea era
+   "Centrocampista · Fuego", que en unas cartas cabía en una línea y en otras
+   se partía en dos, y eso descuadraba la altura de todo lo que venía después.
+   La posición ya se ve en la insignia de la esquina, así que aquí no se
+   repite y el problema desaparece. */
+.player-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.player-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-tag .tag-icon {
+  width: 15px; height: 15px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+/* Los iconos de arquetipo son siluetas blancas, así que se tiñen del azul de
+   los datos secundarios para que no compitan con el nombre del jugador. */
+.player-tag-arch { color: #9ecbff; }
+.player-tag-arch .tag-icon-arch {
+  filter: brightness(0) saturate(100%) invert(78%) sepia(28%) saturate(1200%) hue-rotate(180deg) brightness(102%);
+  opacity: 0.95;
+}
+.player-tag-empty { color: var(--text-muted); font-weight: 400; font-style: italic; opacity: 0.75; }
+
+/* Se mantiene para la ficha emergente del jugador, que sigue usando la
+   insignia clásica de arquetipo. */
 .player-archetype {
-  display: inline-block; margin-top: 4px; font-size: 0.68rem;
-  background: var(--navy-600); color: var(--text-muted); border-radius: 6px; padding: 1px 6px;
+  display: inline-block; margin-top: 4px; font-size: 0.66rem;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  background: rgba(63, 164, 255, 0.14);
+  border: 1px solid rgba(63, 164, 255, 0.3);
+  color: #9ecbff; border-radius: 4px; padding: 2px 7px;
 }
 .cpu-offer-hint {
   margin-top: 6px; font-size: 0.72rem; color: var(--orange);
@@ -484,21 +695,28 @@ a.card:hover, .league-card:hover {
 /* Formation pitch diagram (team page) */
 .pitch-card { padding-bottom: 24px; }
 .card-divider { border-top: 1px solid var(--navy-600); margin: 24px 0; }
+/* El campo es la imagen más característica de la app, así que en vez de un
+   rectángulo verde liso lleva césped segado con brillo, sombreado en los
+   bordes (viñeta) y el foco de luz del estadio arriba. */
 .pitch {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 540px;
   height: 560px;
   margin: 12px auto 0;
-  background: repeating-linear-gradient(
-    to bottom,
-    #2d7a3e 0,
-    #2d7a3e 56px,
-    #33863f 56px,
-    #33863f 112px
-  );
-  border: 3px solid rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255, 255, 255, 0.13), transparent 70%),
+    radial-gradient(ellipse 120% 85% at 50% 50%, transparent 52%, rgba(0, 20, 6, 0.42) 100%),
+    repeating-linear-gradient(
+      to bottom,
+      #2f7f41 0,
+      #2f7f41 56px,
+      #368b44 56px,
+      #368b44 112px
+    );
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px 16px 4px 16px;
+  box-shadow: inset 0 0 40px rgba(0, 25, 8, 0.45), 0 10px 26px rgba(3, 6, 20, 0.5);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -583,7 +801,7 @@ a.card:hover, .league-card:hover {
 /* Individual leaderboards */
 .leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .leaderboard-card h3 { margin-bottom: 10px; font-size: 1rem; }
-.leaderboard-rank { width: 24px; color: var(--text-muted); }
+.leaderboard-rank { width: 34px; }
 .leaderboard-player { display: flex; align-items: center; gap: 10px; }
 .leaderboard-avatar {
   width: 32px; height: 32px; border-radius: 50%; object-fit: contain;
@@ -635,13 +853,36 @@ a.card:hover, .league-card:hover {
 
 .clause-badge {
   margin-top: 6px; font-size: 0.72rem; color: var(--text-muted);
-  background: var(--navy-900); border-radius: 6px; padding: 3px 6px; display: inline-block;
+  background: var(--sunken); border: 1px solid var(--line); border-radius: 5px; padding: 3px 7px; display: inline-block;
 }
 .clause-form { display: flex; gap: 6px; padding: 0 8px 8px; }
 .clause-form input {
-  flex: 1; min-width: 0; padding: 8px; border-radius: 8px;
-  border: 1px solid var(--navy-600); background: var(--navy-900); color: var(--text-light); font-size: 0.85rem;
+  flex: 1; min-width: 0; padding: 7px 8px; border-radius: 3px 9px 3px 9px;
+  border: 1px solid var(--line); background: var(--sunken); color: var(--text-light); font-size: 0.82rem;
 }
+
+/* Acciones dentro de una carta de plantilla: son cosas que se usan de vez en
+   cuando (subir cláusula, liberar), así que van en tamaño reducido y en tono
+   apagado hasta que pasas por encima. Antes ocupaban más que el propio
+   jugador y hacían que la plantilla pareciese un formulario. */
+.player-card .clause-form .btn,
+.player-card form .btn-danger {
+  font-size: 0.72rem;
+  padding: 7px 10px;
+  border-radius: 3px 9px 3px 9px;
+}
+.player-card form .btn-danger {
+  background: transparent;
+  border-color: rgba(255, 77, 94, 0.35);
+  color: rgba(255, 140, 150, 0.75);
+  box-shadow: none;
+}
+.player-card form .btn-danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(255, 77, 94, 0.1);
+}
+.player-card .lineup-toggle { border-top-color: var(--line); }
 
 /* Match replay animation (gameweek detail) */
 .replay { margin-top: 14px; }
@@ -653,9 +894,13 @@ a.card:hover, .league-card:hover {
 .replay-pitch {
   position: relative;
   height: 380px;
-  background: repeating-linear-gradient(to right, #2d7a3e 0, #2d7a3e 36px, #33863f 36px, #33863f 72px);
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
+  background:
+    radial-gradient(ellipse 70% 100% at 50% 0%, rgba(255, 255, 255, 0.12), transparent 65%),
+    radial-gradient(ellipse 115% 90% at 50% 50%, transparent 50%, rgba(0, 20, 6, 0.42) 100%),
+    repeating-linear-gradient(to right, #2f7f41 0, #2f7f41 36px, #368b44 36px, #368b44 72px);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px 14px 4px 14px;
+  box-shadow: inset 0 0 30px rgba(0, 25, 8, 0.4);
   overflow: hidden;
 }
 .replay-halfway { position: absolute; top: 0; bottom: 0; left: 50%; border-left: 2px solid rgba(255, 255, 255, 0.6); }
@@ -798,10 +1043,10 @@ a.card:hover, .league-card:hover {
 
 .auth-page { display: flex; justify-content: center; padding-top: 40px; }
 .auth-card { width: 100%; max-width: 380px; }
-.auth-card label { display: block; margin: 12px 0 4px; font-size: 0.85rem; color: var(--text-muted); }
+.auth-card label { display: block; margin: 14px 0 5px; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
 .auth-card input {
-  width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--navy-600);
-  background: var(--navy-900); color: var(--text-light); font-size: 0.95rem;
+  width: 100%; padding: 11px 13px; border-radius: 3px 12px 3px 12px; border: 1px solid var(--line);
+  background: var(--sunken); color: var(--text-light); font-size: 0.95rem;
 }
 .auth-card button { margin-top: 20px; }
 .auth-subtitle { color: var(--text-muted); font-size: 0.9rem; }
@@ -813,14 +1058,16 @@ a.card:hover, .league-card:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  border-radius: 10px;
+  padding: 13px 16px;
+  border-radius: 3px 14px 3px 14px;
+  border-left-width: 4px;
+  border-left-style: solid;
   margin-bottom: 16px;
   font-size: 0.9rem;
   animation: alert-in 0.25s ease;
 }
-.alert-error { background: rgba(255, 77, 94, 0.15); border: 1px solid var(--red); color: #ffb3ba; }
-.alert-success { background: rgba(51, 192, 122, 0.15); border: 1px solid var(--green); color: #a4f0c6; }
+.alert-error { background: linear-gradient(90deg, rgba(255, 77, 94, 0.2), rgba(255, 77, 94, 0.07)); border: 1px solid rgba(255, 77, 94, 0.45); border-left: 4px solid var(--red); color: #ffb3ba; }
+.alert-success { background: linear-gradient(90deg, rgba(51, 192, 122, 0.2), rgba(51, 192, 122, 0.07)); border: 1px solid rgba(51, 192, 122, 0.45); border-left: 4px solid var(--green); color: #a4f0c6; }
 .alert-close {
   flex-shrink: 0;
   background: none;
@@ -845,10 +1092,34 @@ a.card:hover, .league-card:hover {
   to { opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
 }
 
-/* Leagues */
-.league-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin-top: 12px; }
-.league-card { display: block; }
-.league-code { font-family: monospace; color: var(--orange); }
+/* Leagues
+   La tarjeta de liga es la puerta de entrada a todo lo demás, así que se
+   presenta como un escudo: nombre grande, tu equipo destacado y el resto de
+   datos como fichas pequeñas debajo. */
+.league-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; margin-top: 12px; }
+.league-card { display: block; padding-bottom: 16px; }
+.league-card h3 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-light);
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.league-card p { margin: 6px 0; font-size: 0.88rem; color: var(--text-muted); }
+.league-card p strong { color: var(--yellow); font-size: 0.95rem; }
+.league-code {
+  display: inline-block;
+  margin-top: 10px !important;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.08em;
+  color: var(--orange) !important;
+  background: var(--sunken);
+  border: 1px dashed rgba(255, 122, 26, 0.4);
+  border-radius: 4px;
+  padding: 3px 9px;
+}
 .empty-state { color: var(--text-muted); grid-column: 1/-1; }
 
 .empty-box {
@@ -858,64 +1129,176 @@ a.card:hover, .league-card:hover {
   color: var(--text-muted);
 }
 .empty-box-icon {
-  font-size: 2.4rem;
-  margin-bottom: 10px;
-  opacity: 0.85;
-  filter: drop-shadow(0 0 10px rgba(255, 210, 63, 0.25));
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 72px; height: 72px;
+  font-size: 2rem;
+  margin-bottom: 14px;
+  border-radius: 4px 20px 4px 20px;
+  background: linear-gradient(150deg, rgba(255, 210, 63, 0.12), rgba(63, 164, 255, 0.08));
+  border: 1px dashed var(--line-strong);
+  filter: drop-shadow(0 0 10px rgba(255, 210, 63, 0.2));
 }
 .empty-box p { margin: 0 auto; max-width: 360px; }
 .empty-box-card { padding: 8px; }
 
 .tab-links { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
 
+/* Tablas: cabecera en mayúsculas, filas alternas y realce al pasar por encima.
+   Antes eran filas planas sin jerarquía; ahora se leen como una clasificación
+   deportiva de verdad. */
 .simple-table { width: 100%; border-collapse: collapse; }
-.simple-table th, .simple-table td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--navy-600); }
+.simple-table th, .simple-table td { text-align: left; padding: 11px 10px; border-bottom: 1px solid var(--line); }
 .simple-table thead th {
   position: sticky;
   top: 65px;
-  background: var(--navy-800);
+  background: linear-gradient(180deg, #16215a, #101a44);
   z-index: 2;
-  box-shadow: 0 1px 0 var(--navy-600);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  box-shadow: 0 1px 0 var(--line-strong);
 }
+.simple-table tbody tr { transition: background 0.12s ease; }
+.simple-table tbody tr:nth-child(even) { background: rgba(255, 255, 255, 0.022); }
+.simple-table tbody tr:hover { background: rgba(120, 160, 255, 0.075); }
+.simple-table tbody tr:last-child td { border-bottom: none; }
+
+/* Medallero: el puesto va en una medalla redonda (oro/plata/bronce) en vez de
+   ser un número suelto, y las tres primeras filas llevan un tinte que se
+   desvanece hacia la derecha. */
+.rank-medal {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  font-family: var(--font-head);
+  font-size: 0.8rem; font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+}
+.rank-medal.rank-1 { background: linear-gradient(160deg, #ffe07a, #e8a900); border-color: #ffd23f; color: #3a2600; box-shadow: 0 0 12px rgba(255, 200, 60, 0.45); }
+.rank-medal.rank-2 { background: linear-gradient(160deg, #eef3fb, #9fb0cc); border-color: #d8e3f5; color: #1e2740; }
+.rank-medal.rank-3 { background: linear-gradient(160deg, #e5a469, #b46a2c); border-color: #e0954f; color: #2e1600; }
+.standings-table tbody tr:nth-child(1) { background: linear-gradient(90deg, rgba(255, 210, 63, 0.1), transparent 45%); }
+.standings-table tbody tr:nth-child(2) { background: linear-gradient(90deg, rgba(216, 227, 245, 0.07), transparent 45%); }
+.standings-table tbody tr:nth-child(3) { background: linear-gradient(90deg, rgba(224, 149, 79, 0.07), transparent 45%); }
+/* la fila del líder, resaltada con un canto naranja */
 .standings-leader td { color: var(--orange); font-weight: 700; }
+.standings-leader td:first-child { box-shadow: inset 3px 0 0 var(--orange); }
 
 /* Market filter bar */
 .filter-bar { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 16px; }
 @media (max-width: 900px) { .filter-bar { grid-template-columns: 1fr 1fr; } }
 
-/* Player cards */
-.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; }
+/* Player cards — cromos con escalón de calidad
+   ------------------------------------------------------------------
+   Cada carta se tiñe según lo que vale el personaje (bronce/plata/oro/
+   leyenda). Antes todas las cartas eran cajas azul marino idénticas, así que
+   una parrilla de 22 jugadores no decía nada de un vistazo; ahora las buenas
+   destacan solas. El color se controla con --tier / --tier-soft, que fija
+   cada clase .tier-*, y todo lo demás está escrito una sola vez. */
+.player-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 16px; }
 .player-card {
-  background: linear-gradient(165deg, var(--navy-700) 0%, var(--navy-800) 100%);
-  border: 1px solid var(--navy-600);
-  border-radius: 14px;
+  --tier: var(--tier-bronze);
+  --tier-soft: rgba(201, 138, 75, 0.16);
+  position: relative;
+  background:
+    linear-gradient(180deg, var(--tier-soft) 0%, transparent 42%),
+    linear-gradient(162deg, #1b2a63 0%, #101a44 52%, #0a1130 100%);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--tier);
+  border-radius: 3px 14px 3px 14px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3), 0 8px 18px rgba(4, 8, 24, 0.4);
-  transition: border-color 0.15s ease;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 10px 20px rgba(3, 6, 20, 0.45);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.player-card:hover { border-color: var(--orange); }
+.player-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--tier);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35), 0 16px 28px rgba(3, 6, 20, 0.55), 0 0 18px -4px var(--tier);
+}
+.player-card.tier-plata { --tier: var(--tier-silver); --tier-soft: rgba(198, 211, 234, 0.16); }
+.player-card.tier-oro { --tier: var(--tier-gold); --tier-soft: rgba(255, 201, 60, 0.18); }
+.player-card.tier-leyenda { --tier: var(--tier-legend); --tier-soft: rgba(176, 107, 255, 0.22); }
+/* las leyendas además llevan un destello que recorre la carta */
+.player-card.tier-leyenda::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.09) 47%, transparent 56%);
+  pointer-events: none;
+}
+
 .player-card-top {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 8px 10px; border-bottom: 3px solid var(--blue-accent);
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  padding: 7px 10px;
+  background: linear-gradient(90deg, var(--tier-soft), transparent);
   font-size: 0.8rem; font-weight: 700;
 }
 .player-position-badge {
-  background: var(--navy-600); padding: 2px 8px; border-radius: 6px; font-size: 0.75rem;
+  background: var(--tier);
+  color: #10142c;
+  padding: 2px 9px;
+  border-radius: 4px 9px 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
-.player-price { color: var(--orange); }
-.player-sprite-wrap { display: flex; justify-content: center; padding: 10px; background: var(--navy-900); }
-.player-sprite { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; }
+.player-price { color: var(--tier); font-size: 0.78rem; text-shadow: 0 0 10px rgba(0, 0, 0, 0.6); }
+/* foco de luz detrás del personaje, para que no flote sobre un cuadro negro */
+.player-sprite-wrap {
+  position: relative;
+  display: flex; justify-content: center; padding: 8px 10px 4px;
+  background:
+    radial-gradient(ellipse 62% 58% at 50% 62%, var(--tier-soft), transparent 72%),
+    var(--sunken);
+}
+.player-sprite { width: 96px; height: 96px; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5)); }
 .player-sprite-placeholder {
   width: 96px; height: 96px; display: flex; align-items: center; justify-content: center;
   font-size: 2.5rem; color: var(--text-muted);
 }
 .player-card-body { padding: 8px 10px; flex-grow: 1; }
 .player-card-info { padding: 8px 10px 0; }
-.player-card-clickable { cursor: pointer; }
+/* La zona pulsable ocupa el hueco sobrante para que todas las cartas de una
+   fila midan lo mismo y los botones de pujar queden alineados abajo. */
+.player-card-clickable { cursor: pointer; display: flex; flex-direction: column; flex: 1 1 auto; }
+.player-card-clickable > .player-card-body,
+.player-card-clickable > .player-card-info { flex: 1 1 auto; }
+/* El juego de procedencia es un dato secundario: como máximo dos líneas, para
+   que no empuje al resto de la carta. */
+.player-card .player-meta-small { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* En móvil, una sola columna convertía el mercado (22 jugadores) en un scroll
+   larguísimo. A dos columnas con la carta compacta se recorre mucho mejor. */
+@media (max-width: 700px) {
+  .player-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .player-sprite, .player-sprite-placeholder { width: 74px; height: 74px; }
+  .player-name { font-size: 0.82rem; }
+  .player-meta { font-size: 0.72rem; }
+  .player-meta-small { font-size: 0.66rem; }
+  .player-card-top { padding: 6px 8px; font-size: 0.72rem; }
+  .player-card-body, .player-card-info { padding-left: 8px; padding-right: 8px; }
+  .bid-form { flex-direction: column; gap: 5px; }
+  .player-card .btn { font-size: 0.72rem; padding: 7px 8px; }
+  .player-card .player-meta-small { -webkit-line-clamp: 1; }
+}
+@media (max-width: 380px) {
+  .player-grid { grid-template-columns: 1fr; }
+}
 .player-card-clickable:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
-.player-name { font-weight: 700; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* El nombre va sobre una banda, como en un cromo, en vez de ser otra línea
+   de texto más perdida entre las demás. */
+.player-name {
+  font-family: var(--font-head);
+  font-weight: 700; font-size: 0.92rem; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding-bottom: 5px;
+  margin-bottom: 5px;
+  border-bottom: 1px solid var(--line);
+}
 .player-meta { font-size: 0.78rem; color: var(--text-muted); }
 .player-meta-small { font-size: 0.72rem; opacity: 0.8; }
 .element-icon { width: 14px; height: 14px; vertical-align: -2px; margin-right: 2px; border-radius: 3px; }
@@ -987,10 +1370,28 @@ a.card:hover, .league-card:hover {
   white-space: normal;
 }
 
-/* Home / landing page */
+/* Home / landing page
+   La portada es lo primero que ve alguien que llega de fuera, así que el
+   titular va sobre un foco de luz y unas "líneas de velocidad" diagonales
+   (puro CSS) en vez de flotar sobre el fondo sin más. */
 .home-hero {
+  position: relative;
   text-align: center;
-  padding: 48px 16px 32px;
+  padding: 60px 16px 46px;
+  margin-bottom: 8px;
+  isolation: isolate;
+}
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 -32px;
+  z-index: -1;
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 210, 63, 0.05) 0 2px, transparent 2px 22px),
+    radial-gradient(ellipse 55% 75% at 50% 42%, rgba(63, 120, 255, 0.22), transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 90% at 50% 45%, #000 35%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 90% at 50% 45%, #000 35%, transparent 78%);
+  pointer-events: none;
 }
 .home-hero h1 {
   font-size: 2.6rem;
@@ -1038,7 +1439,18 @@ a.card:hover, .league-card:hover {
 }
 @media (max-width: 700px) { .home-features { grid-template-columns: 1fr; } }
 .home-feature { display: flex; gap: 14px; align-items: flex-start; }
-.home-feature-icon { font-size: 1.8rem; line-height: 1; }
+/* Los iconos van en una baldosa con marco: así parecen parte del diseño y no
+   un emoji suelto pegado al lado del texto. */
+.home-feature-icon {
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px;
+  font-size: 1.35rem; line-height: 1;
+  border-radius: 3px 12px 3px 12px;
+  background: linear-gradient(150deg, rgba(255, 210, 63, 0.16), rgba(63, 164, 255, 0.1));
+  border: 1px solid var(--line-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
 .home-feature h3 { margin: 0 0 6px; font-size: 1rem; }
 .home-footer,
 .site-footer {

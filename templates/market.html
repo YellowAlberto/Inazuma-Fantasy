@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_player_tags.html" import player_tags %}
 {% block title %}Mercado de pujas · {{ league.name }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -73,11 +74,11 @@
 
 <div class="player-grid">
   {% for p in players %}
-  <div class="player-card">
+  <div class="player-card tier-{{ (p.market_value or p.price) | value_tier }}">
     <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
       <div class="player-card-top">
-        <span class="player-position-badge">{{ p.posicion }}</span>
-        <span class="player-price">Valor: {{ (p.market_value or p.price)|euros }}</span>
+        <span class="player-position-badge" title="{{ position_labels[p.posicion] }}">{{ p.posicion }}</span>
+        <span class="player-price">{{ (p.market_value or p.price)|euros }}</span>
       </div>
       <div class="player-sprite-wrap">
         {% if p.sprite_url %}
@@ -88,12 +89,7 @@
       </div>
       <div class="player-card-body">
         <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-        <div class="player-meta">
-          {{ position_labels[p.posicion] }} ·
-          {% if p.elemento | element_icon %}<img src="{{ url_for('static', filename='icons/elements/' + (p.elemento | element_icon)) }}" alt="" class="element-icon">{% endif %}
-          {{ p.elemento | element_label }}
-        </div>
-        {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+        {{ player_tags(p) }}
         <div class="player-meta player-meta-small">{{ p.juego | display_season }}</div>
         <div class="player-meta player-meta-small">🏆 {{ p.total_points }} pts hechos</div>
         {% if p.bid_count %}

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_player_tags.html" import player_tags %}
 {% block title %}{{ team_name }} · {{ league.name }}{% endblock %}
 {% block content %}
 <div class="page-header">
@@ -54,10 +55,10 @@
 <p class="muted player-detail-hint">👆 Toca un personaje para ver sus estadísticas, sus puntos por jornada y la evolución de su valor.</p>
 <div class="player-grid">
   {% for p in squad %}
-  <div class="player-card {{ 'player-card-starter' if p.in_lineup else '' }}">
+  <div class="player-card tier-{{ p.price | value_tier }} {{ 'player-card-starter' if p.in_lineup else '' }}">
     <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
       <div class="player-card-top">
-        <span class="player-position-badge">{{ p.posicion }}</span>
+        <span class="player-position-badge" title="{{ position_labels[p.posicion] }}">{{ p.posicion }}</span>
         <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
       </div>
       <div class="player-sprite-wrap">
@@ -69,13 +70,7 @@
       </div>
       <div class="player-card-body">
         <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-        <div class="player-meta">
-          {{ position_labels[p.posicion] }} ·
-          {% if p.elemento | element_icon %}<img src="{{ url_for('static', filename='icons/elements/' + (p.elemento | element_icon)) }}" alt="" class="element-icon">{% endif %}
-          {{ p.elemento | element_label }}
-        </div>
-        {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
-        {% if p.in_lineup %}<span class="player-archetype" style="background: var(--orange); color: #1a0d00;">Titular</span>{% endif %}
+        {{ player_tags(p) }}
         <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
       </div>
     </div>

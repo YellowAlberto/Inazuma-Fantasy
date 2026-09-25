@@ -1,6 +1,7 @@
 // Lets you click a player on the pitch diagram and swap them for a bench
-// player of the same position, by toggling the existing "Titular" checkboxes
-// behind the scenes. No framework, no build step — just plain DOM code.
+// player of the same position, by toggling the (now hidden) "player_ids"
+// checkboxes behind the scenes. Esos input son los que llevan la alineación
+// al enviar el formulario. No framework, no build step — just plain DOM code.
 document.addEventListener('DOMContentLoaded', function () {
   var squadDataEl = document.getElementById('squad-data');
   if (!squadDataEl) return;
@@ -18,6 +19,16 @@ document.addEventListener('DOMContentLoaded', function () {
   function closePopup() {
     var existing = document.querySelector('.pitch-swap-popup');
     if (existing) existing.remove();
+  }
+
+  // Como la casilla "Titular" ya no se ve, la carta de la plantilla es ahora
+  // la única señal de quién juega: al intercambiar dos jugadores marcamos y
+  // desmarcamos su carta en el momento, sin esperar a recargar la página.
+  function setCardStarter(playerId, isStarter) {
+    var clickable = document.querySelector('.player-card-clickable[data-player-id="' + playerId + '"]');
+    if (!clickable) return;
+    var card = clickable.closest('.player-card');
+    if (card) card.classList.toggle('player-card-starter', isStarter);
   }
 
   function updateSlotVisual(slot, player) {
@@ -67,11 +78,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
           item.addEventListener('click', function (ev) {
             ev.stopPropagation();
-            var outgoing = squadPlayerById(currentId);
             var outgoingCb = getCheckbox(currentId);
             var incomingCb = getCheckbox(c.id);
             if (outgoingCb) outgoingCb.checked = false;
             if (incomingCb) incomingCb.checked = true;
+
+            setCardStarter(currentId, false);
+            setCardStarter(c.id, true);
 
             updateSlotVisual(slot, c);
             closePopup();

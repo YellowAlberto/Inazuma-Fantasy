@@ -262,6 +262,12 @@
 .draft-page .slot { z-index: 2; }
 .draft-page .slot:hover, .draft-page .slot.drop { z-index: 9; }
 .draft-page .tag.arq { color: #d7b8ff; }
+/* Los iconos de arquetipo son siluetas blancas: aquí se tiñen del mismo lila
+   que el texto de la etiqueta para que la insignia se lea como una pieza. */
+.draft-page .tag.arq .tag-icon-arch {
+  border-radius: 0;
+  filter: brightness(0) saturate(100%) invert(82%) sepia(30%) saturate(900%) hue-rotate(215deg) brightness(105%);
+}
 @media (max-width: 900px) { .draft-page .link-badge { min-width: 16px; height: 16px; font-size: .6rem; border-width: 1px; } }
 
 /* ---------- previsualización de intercambio (media/química/puntos al pasar el ratón) ---------- */

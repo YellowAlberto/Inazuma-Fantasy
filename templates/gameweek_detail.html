@@ -108,12 +108,12 @@
 
 <h2 class="section-title">Puntos fantasy por equipo</h2>
 <div class="card">
-  <table class="simple-table">
+  <table class="simple-table standings-table">
     <thead><tr><th>#</th><th>Equipo</th><th>Entrenador</th><th>Puntos</th></tr></thead>
     <tbody>
       {% for t in totals %}
       <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
-        <td>{{ loop.index }}</td>
+        <td><span class="rank-medal rank-{{ loop.index if loop.index <= 3 else 'n' }}">{{ loop.index }}</span></td>
         <td>{{ t.team_name }}</td>
         <td>{{ t.username }}</td>
         <td><strong>{{ t.total_points }}</strong></td>

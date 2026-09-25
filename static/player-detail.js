@@ -113,9 +113,19 @@
             elIcon.className = 'element-icon';
             metaEl.appendChild(elIcon);
           }
-          metaEl.appendChild(document.createTextNode(
-            data.elemento + (data.arquetipo ? ' · ' + data.arquetipo : '') + ' · ' + data.juego
-          ));
+          metaEl.appendChild(document.createTextNode(data.elemento));
+          if (data.arquetipo) {
+            metaEl.appendChild(document.createTextNode(' · '));
+            if (data.arquetipo_icon_url) {
+              var arqIcon = document.createElement('img');
+              arqIcon.src = data.arquetipo_icon_url;
+              arqIcon.alt = '';
+              arqIcon.className = 'element-icon tag-icon-arch';
+              metaEl.appendChild(arqIcon);
+            }
+            metaEl.appendChild(document.createTextNode(data.arquetipo));
+          }
+          metaEl.appendChild(document.createTextNode(' · ' + data.juego));
           document.getElementById('player-detail-value').textContent = data.current_value_label;
           document.getElementById('player-detail-total-points').textContent = data.total_points;
 

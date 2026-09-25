@@ -5,6 +5,7 @@ from flask import flash, jsonify, redirect, render_template, request, session, u
 
 from core import (
     ROTULOS_MANIFEST,
+    archetype_icon,
     element_icon,
     element_label,
     euros_to_points,
@@ -202,6 +203,10 @@ def register_market_routes(app):
                     if element_icon(player["elemento"]) else None
                 ),
                 "arquetipo": player["arquetipo"] if player["arquetipo"] != "Unknown" else None,
+                "arquetipo_icon_url": (
+                    url_for("static", filename=f"icons/archetypes/{archetype_icon(player['arquetipo'])}")
+                    if archetype_icon(player["arquetipo"]) else None
+                ),
                 "sprite_url": player["sprite_url"],
                 "juego": season_label_es(season_group_label(player["juego"])),
                 "stats": {

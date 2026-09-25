@@ -11,12 +11,12 @@
 </div>
 
 <div class="card">
-  <table class="simple-table">
+  <table class="simple-table standings-table">
     <thead><tr><th>#</th><th>Equipo</th><th>Entrenador</th><th>Puntos</th></tr></thead>
     <tbody>
       {% for s in standings %}
       <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
-        <td>{{ loop.index }}</td>
+        <td><span class="rank-medal rank-{{ loop.index if loop.index <= 3 else 'n' }}">{{ loop.index }}</span></td>
         <td><a href="{{ url_for('view_member_team', league_id=league.id, user_id=s.user_id) }}">{{ s.team_name }}</a></td>
         <td>
           {% if s.avatar_sprite_url %}

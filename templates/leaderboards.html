@@ -18,7 +18,7 @@
       <tbody>
         {% for r in cat.rows %}
         <tr class="{{ 'standings-leader' if loop.index == 1 else '' }}">
-          <td class="leaderboard-rank">{{ loop.index }}</td>
+          <td class="leaderboard-rank"><span class="rank-medal rank-{{ loop.index if loop.index <= 3 else 'n' }}">{{ loop.index }}</span></td>
           <td class="leaderboard-player">
             {% if r.sprite_url %}
               <img src="{{ r.sprite_url }}" alt="{{ r.nombre }}" class="leaderboard-avatar">

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_player_tags.html" import player_tags %}
 {% block title %}Mi equipo · {{ league.name }}{% endblock %}
 {% block content %}
 
@@ -145,10 +146,10 @@
 <div class="player-grid">
   {% for p in squad %}
   <div class="player-card-wrap">
-    <div class="player-card {{ 'player-card-starter' if p.in_lineup else '' }}">
+    <div class="player-card tier-{{ p.price | value_tier }} {{ 'player-card-starter' if p.in_lineup else '' }}">
       <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
         <div class="player-card-top">
-          <span class="player-position-badge">{{ p.posicion }}</span>
+          <span class="player-position-badge" title="{{ position_labels[p.posicion] }}">{{ p.posicion }}</span>
           <span class="player-price">{{ p.acquired_price|euros if p.acquired_price else 'Gratis' }}</span>
         </div>
         <div class="player-sprite-wrap">
@@ -160,22 +161,17 @@
         </div>
         <div class="player-card-info">
           <div class="player-name" title="{{ p.nombre }}">{{ p.nombre }}</div>
-          <div class="player-meta">
-            {{ position_labels[p.posicion] }} ·
-            {% if p.elemento | element_icon %}<img src="{{ url_for('static', filename='icons/elements/' + (p.elemento | element_icon)) }}" alt="" class="element-icon">{% endif %}
-            {{ p.elemento | element_label }}
-          </div>
-          {% if p.arquetipo and p.arquetipo != 'Unknown' %}<span class="player-archetype">{{ p.arquetipo }}</span>{% endif %}
+          {{ player_tags(p) }}
           {% if p.history %}<span class="player-history-hint">📊 {{ p.history|length }} jornada{{ 's' if p.history|length != 1 else '' }} jugada{{ 's' if p.history|length != 1 else '' }}</span>{% endif %}
           <div class="clause-badge">🔒 Cláusula: {{ p.clause_value|euros }}</div>
         </div>
       </div>
-      <div class="player-card-body">
-        <label class="checkbox-item lineup-toggle">
-          <input type="checkbox" name="player_ids" value="{{ p.id }}" form="lineup-form" {{ 'checked' if p.in_lineup else '' }}>
-          Titular
-        </label>
-      </div>
+      {# La casilla "Titular" ya no se muestra: los cambios se hacen pinchando
+         en el jugador del campo. El input sigue aquí (oculto) porque es lo que
+         lleva la alineación al enviar el formulario, y es lo que team.js marca
+         y desmarca al intercambiar dos jugadores. #}
+      <input type="checkbox" name="player_ids" value="{{ p.id }}" form="lineup-form"
+             {{ 'checked' if p.in_lineup else '' }} hidden>
       <form method="post" action="{{ url_for('increase_clause', league_id=league.id, player_id=p.id) }}" class="clause-form">
         <input type="number" name="amount" min="0.1" step="0.1" placeholder="Subir +M €">
         <button class="btn btn-secondary" type="submit">Subir cláusula</button>
