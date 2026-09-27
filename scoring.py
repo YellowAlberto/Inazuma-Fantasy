@@ -129,14 +129,14 @@ KEY_PASS_GOAL_CHANCE_BONUS = 0.1  # small boost if the exact receiver shoots on 
 CLEAN_SHEET_POINTS = {"GK": 3, "DF": 3, "MF": 2, "FW": 1}
 SAVE_POINTS = 1
 STEAL_POINTS = 1
-STEAL_POINTS_CAP = 3  # per player, so one very active tackler can't outscore goals
+STEAL_POINTS_CAP = 4  # per player, so one very active tackler can't outscore goals
 LOSS_POINTS = -1
 LOSS_POINTS_CAP = 3  # per player, so one unlucky player can't be tanked into deep negatives
 GOALS_CONCEDED_DIVISOR = {"GK": 2, "DF": 2, "MF": 4, "FW": 4}  # -1 point every N goals conceded
 KEY_PASS_POINTS = 1
 KEY_PASS_POINTS_CAP = 3
 CLEARANCE_POINTS = 1
-CLEARANCE_POINTS_CAP = 3
+CLEARANCE_POINTS_CAP = 4
 CLEARANCE_RECOVERED_BY_OWN_TEAM_CHANCE = 0.28  # a hoofed clearance mostly goes to the pressing side, not back to a teammate
 INTERCEPTION_POINTS = 1
 INTERCEPTION_POINTS_CAP = 3
@@ -623,7 +623,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     # Juego Sucio: a more aggressive, no-nonsense press wins the
                     # ball back more often.
                     if "Juego Sucio" in other["affinities"]:
-                        defend_skill += 0.15 * affinity_scale(other["affinities"]["Juego Sucio"])
+                        defend_skill += 0.30 * affinity_scale(other["affinities"]["Juego Sucio"])
                     if defend_skill + random.uniform(0, 0.35) > attack_skill:
                         log = other["logs"][defender["id"]]
                         log.steals += 1
@@ -638,7 +638,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                                 f"🛡️ Robo de balón de {defender['nombre']} ({other['label']})",
                                 {"minute": minute, "type": "steal", "side": other_key, "player": defender["nombre"], "player_id": defender["id"], "sprite_url": defender.get("sprite_url"), "from_player": attacker["nombre"], "from_id": attacker["id"]},
                             ))
-                    elif "Brecha" in other["affinities"] and random.random() < 0.35 * affinity_scale(other["affinities"]["Brecha"]):
+                    elif "Brecha" in other["affinities"] and random.random() < 0.62 * affinity_scale(other["affinities"]["Brecha"]):
                         # Brecha: even when the tackle itself fails, a sharp
                         # defensive read cleans up the danger anyway.
                         log = other["logs"][defender["id"]]
@@ -808,16 +808,20 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 
             # Justicia: a well-organized defensive block is harder to break down.
             if "Justicia" in other["affinities"]:
-                goal_chance -= 0.07 * affinity_scale(other["affinities"]["Justicia"])
+                goal_chance -= 0.055 * affinity_scale(other["affinities"]["Justicia"])
             # Contraataque: clinical when soaking up pressure and hitting on
             # the break, i.e. when this side doesn't dominate possession.
             if "Contraataque" in side["affinities"]:
                 side_possession = home_possession_prob if side_key == "home" else (1 - home_possession_prob)
+                esc = affinity_scale(side["affinities"]["Contraataque"])
+                # una parte siempre activa, para que no sea inútil cuando
+                # dominas el balón, y el grueso al contragolpe
+                goal_chance += 0.03 * esc
                 if side_possession < 0.5:
-                    goal_chance += 0.08 * affinity_scale(side["affinities"]["Contraataque"])
+                    goal_chance += 0.07 * esc
             # Tensión: thrives under pressure in the closing stages.
-            if "Tensión" in side["affinities"] and minute >= 70:
-                goal_chance += 0.08 * affinity_scale(side["affinities"]["Tensión"])
+            if "Tensión" in side["affinities"] and minute >= 60:
+                goal_chance += 0.10 * affinity_scale(side["affinities"]["Tensión"])
 
             # A key pass primed exactly this player: if their team's very
             # next play is them shooting, they get a small boosted chance
@@ -936,6 +940,11 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 pts = log.goals * GOAL_POINTS[pos]
                 points += pts
                 breakdown.append(f"⚽ {log.goals} gol{'es' if log.goals > 1 else ''} (+{pts})")
+                arq = p.get("arquetipo")
+                if arq in OFFENSIVE_AFFINITIES and arq in side["affinities"]:
+                    extra = log.goals * OFFENSIVE_AFFINITY_GOAL_BONUS
+                    points += extra
+                    breakdown.append(f"🔥 {arq} activo al marcar (+{extra})")
             if log.assists:
                 pts = log.assists * ASSIST_POINTS
                 points += pts
@@ -1029,8 +1038,35 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
 # several characters who share the same in-game personality archetype
 # (Justicia, Contraataque, Tensión...), not just raw stats.
 # ---------------------------------------------------------------------------
-AFFINITY_THRESHOLDS = [(8, 3), (6, 2), (4, 1)]  # (min players sharing it, bonus points)
+AFFINITY_THRESHOLDS = [(6, 2), (4, 1)]  # (min players sharing it, bonus points)
+# Sólo los N primeros jugadores de un arquetipo cobran el bono. Sin este tope
+# el bono era n x puntos con los dos factores creciendo, así que un equipo
+# entero del mismo arquetipo se llevaba +33 puntos: más que cualquier otra
+# cosa del juego. Con el tope, apilar compensa hasta 7 y deja de dispararse.
+AFFINITY_BONUS_PLAYER_CAP = 7
+
+# Arquetipos de ataque: cuando su afinidad está activa, cada gol que marque un
+# jugador de ese arquetipo vale un punto más. Existe porque los efectos
+# defensivos reparten entre los once (la portería a cero la cobran todos)
+# mientras que los ofensivos concentran en quien marca, así que a igualdad de
+# ajuste los de ataque rendían siempre menos. Afinidad se queda fuera: ya cobra
+# por sus pases clave y va sobrada.
+OFFENSIVE_AFFINITIES = ("Contraataque", "Tensión")
+OFFENSIVE_AFFINITY_GOAL_BONUS = 1
 MATCH_AFFINITY_THRESHOLD = 4  # players needed for a live in-match effect to kick in
+
+# Qué hace cada afinidad dentro del partido. Vive aquí, pegado a las reglas,
+# porque describe lo que hace simulate_fixture unas líneas más abajo: si el
+# efecto cambia, el texto está al lado y se cambia con él. La pantalla "Mi
+# equipo" lee esto para explicar en vivo lo que gana tu alineación.
+AFFINITY_EFFECTS = {
+    "Justicia": "Defensa más sólida: al rival le cuesta más marcaros.",
+    "Contraataque": "Más letales al contragolpe, sobre todo si tenéis menos posesión. +1 punto por cada gol suyo.",
+    "Juego Sucio": "Presión más agresiva: ganáis más robos de balón.",
+    "Tensión": "Rendís mejor en la última media hora. +1 punto por cada gol suyo.",
+    "Afinidad": "Mejor conexión entre compañeros: más pases clave.",
+    "Brecha": "Leéis mejor el juego defensivo: más despejes e intercepciones.",
+}
 
 # Once an affinity is active (>=4 sharing players), its in-match effect keeps
 # growing a little with every extra player sharing it, instead of being a
@@ -1065,14 +1101,18 @@ def compute_affinity_bonuses(lineup):
     starting lineup who share a common archetype with enough teammates."""
     counts = Counter(p["arquetipo"] for p in lineup if p.get("arquetipo") and p["arquetipo"] != "Unknown")
     bonuses = {}
+    cobrados = Counter()
     for p in lineup:
         arquetipo = p.get("arquetipo")
         if not arquetipo or arquetipo == "Unknown":
             continue
         count = counts.get(arquetipo, 0)
+        if cobrados[arquetipo] >= AFFINITY_BONUS_PLAYER_CAP:
+            continue
         for min_count, bonus in AFFINITY_THRESHOLDS:
             if count >= min_count:
                 bonuses[p["id"]] = (bonus, arquetipo)
+                cobrados[arquetipo] += 1
                 break
     return bonuses
 

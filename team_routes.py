@@ -5,6 +5,9 @@ cláusulas de rescisión."""
 from flask import flash, redirect, render_template, request, session, url_for
 
 from core import (
+    ARCHETYPE_ICON_FILE,
+    ELEMENT_ES,
+    ELEMENT_ICON_FILE,
     CLAUSE_LEAGUE_AGE_DAYS,
     CLAUSE_MIN_INCREASE,
     euros_to_points,
@@ -24,7 +27,21 @@ from league_engine import (
     pending_bids_total,
     squad_spent,
 )
-from scoring import DEFAULT_FORMATION, FORMATIONS, POSITION_LABELS, count_missing_slots, formation_requirements, missing_positions_message, validate_lineup
+from scoring import (
+    AFFINITY_BONUS_PLAYER_CAP,
+    AFFINITY_EFFECTS,
+    AFFINITY_SCALE_CAP,
+    AFFINITY_SCALE_PER_EXTRA_PLAYER,
+    AFFINITY_THRESHOLDS,
+    DEFAULT_FORMATION,
+    FORMATIONS,
+    MATCH_AFFINITY_THRESHOLD,
+    POSITION_LABELS,
+    count_missing_slots,
+    formation_requirements,
+    missing_positions_message,
+    validate_lineup,
+)
 
 
 def register_team_routes(app):
@@ -174,6 +191,25 @@ def register_team_routes(app):
             is_valid=is_valid and len(lineup_players) == total_needed,
             missing_msg=missing_msg,
             show_new_squad_popup=request.args.get("new_squad") == "1",
+            # Etiquetas e iconos para la tarjeta que sale al pasar el ratón
+            # por un jugador del campo. Vienen de core.py para no tener una
+            # segunda copia en JavaScript.
+            ui_maps={
+                "element_es": ELEMENT_ES,
+                "element_icon": ELEMENT_ICON_FILE,
+                "archetype_icon": ARCHETYPE_ICON_FILE,
+                "position_labels": POSITION_LABELS,
+            },
+            # Reglas de afinidad tal cual las aplica scoring.py, para que el
+            # panel en vivo no tenga su propia copia que se quede vieja.
+            affinity_rules={
+                "thresholds": AFFINITY_THRESHOLDS,
+                "bonus_player_cap": AFFINITY_BONUS_PLAYER_CAP,
+                "match_threshold": MATCH_AFFINITY_THRESHOLD,
+                "scale_per_extra": AFFINITY_SCALE_PER_EXTRA_PLAYER,
+                "scale_cap": AFFINITY_SCALE_CAP,
+                "effects": AFFINITY_EFFECTS,
+            },
             spent=round(spent),
             bonus_budget=round(bonus_budget),
             remaining=round(league["budget"] + bonus_budget - spent),

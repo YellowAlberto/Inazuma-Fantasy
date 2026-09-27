@@ -1,9 +1,12 @@
 """Alta y gestión de ligas: crear, unirse, ver el detalle, cambiar el
 webhook de Discord, terminar o borrar una liga."""
 
+import json
+
 from flask import flash, redirect, render_template, request, session, url_for
 
 from core import (
+    MAX_LEAGUE_CYCLES,
     MAX_LEAGUE_MEMBERS,
     euros_to_points,
     get_db,
@@ -215,6 +218,32 @@ def register_leagues_routes(app):
 
 
 
+    @app.route("/leagues/<league:league_id>/settings")
+    @login_required
+    def league_settings(league_id):
+        """Ajustes de la liga: avisos de Discord y las acciones que no tienen
+        vuelta atrás. Antes vivían al final de la página de la liga, donde
+        cualquiera que bajase se encontraba el botón de borrarla."""
+        league, membership = require_membership(league_id)
+        if not league:
+            flash("No perteneces a esta liga o no existe.", "error")
+            return redirect(url_for("leagues"))
+        if league["creator_id"] != session["user_id"]:
+            flash("Solo el creador de la liga puede ver sus ajustes.", "error")
+            return redirect(url_for("league_detail", league_id=league_id))
+
+        # El total de jornadas no es una columna: sale del calendario guardado,
+        # igual que en la página de jornadas.
+        schedule = json.loads(league["schedule_json"] or "[]")
+        total_rounds = len(schedule) if schedule and schedule[0] else 0
+
+        return render_template(
+            "league_settings.html",
+            league=league,
+            is_creator=True,
+            max_gameweeks=total_rounds * MAX_LEAGUE_CYCLES if total_rounds else None,
+        )
+
     @app.route("/leagues/<league:league_id>/discord-webhook", methods=["POST"])
     @login_required
 
@@ -230,13 +259,13 @@ def register_leagues_routes(app):
         webhook = request.form.get("discord_webhook", "").strip()
         if webhook and not webhook.startswith("https://discord.com/api/webhooks/") and not webhook.startswith("https://discordapp.com/api/webhooks/"):
             flash("Eso no parece una URL de webhook de Discord válida (debe empezar por https://discord.com/api/webhooks/...).", "error")
-            return redirect(url_for("league_detail", league_id=league_id))
+            return redirect(url_for("league_settings", league_id=league_id))
 
         db = get_db()
         db.execute("UPDATE leagues SET discord_webhook = ? WHERE id = ?", (webhook or None, league_id))
         db.commit()
         flash("¡Webhook de Discord guardado! A partir de ahora los avisos de esta liga llegarán a ese canal." if webhook else "Webhook de Discord desactivado para esta liga.", "success")
-        return redirect(url_for("league_detail", league_id=league_id))
+        return redirect(url_for("league_settings", league_id=league_id))
 
 
 
@@ -255,7 +284,7 @@ def register_leagues_routes(app):
         confirm_name = request.form.get("confirm_name", "").strip()
         if confirm_name != league["name"]:
             flash("El nombre no coincide, así que no se ha eliminado nada. Escribe el nombre exacto de la liga para confirmar.", "error")
-            return redirect(url_for("league_detail", league_id=league_id))
+            return redirect(url_for("league_settings", league_id=league_id))
 
         db = get_db()
         gameweek_ids = [

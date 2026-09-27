@@ -53,7 +53,7 @@
 
 <h2 class="section-title">Plantilla completa ({{ squad|length }} jugadores)</h2>
 <p class="muted player-detail-hint">👆 Toca un personaje para ver sus estadísticas, sus puntos por jornada y la evolución de su valor.</p>
-<div class="player-grid">
+<div class="player-grid" data-anim="stagger">
   {% for p in squad %}
   <div class="player-card tier-{{ p.price | value_tier }} {{ 'player-card-starter' if p.in_lineup else '' }}">
     <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">

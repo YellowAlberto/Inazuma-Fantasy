@@ -278,11 +278,18 @@ function optionCard(p, isManager) {
   </button>`;
 }
 
+// Las cartas del sobre entran repartidas una a una. Si GSAP no cargó,
+// inazumaMotion.staggerIn no hace nada y el sobre aparece de golpe, como antes.
+function dealOptions() {
+  if (window.inazumaMotion) window.inazumaMotion.staggerIn($('options'));
+}
+
 function showOffer(offer) {
   $('modal-title').textContent = offer.slot < 11 ? `Elige tu ${S.slots[offer.slot].label}` : `Elige tu suplente ${offer.slot - 10}`;
   $('options').innerHTML = offer.options.map(p => optionCard(p, false)).join('');
   $('modal').classList.remove('hidden');
   $('peek-reopen-btn').classList.add('hidden');
+  dealOptions();
   document.querySelectorAll('#options .option').forEach(el => el.onclick = async () =>
     render(await api(`/api/slot/${offer.slot}/pick`, { player_id: +el.dataset.id })));
 }
@@ -292,6 +299,7 @@ function showManagerOffer(offer) {
   $('options').innerHTML = offer.options.map(p => optionCard(p, true)).join('');
   $('modal').classList.remove('hidden');
   $('peek-reopen-btn').classList.add('hidden');
+  dealOptions();
   document.querySelectorAll('#options .option').forEach(el => el.onclick = async () =>
     render(await api('/api/manager/pick', { player_id: +el.dataset.id })));
 }
@@ -317,6 +325,9 @@ $('finish-btn').onclick = async () => {
   render(st);
   showResult(st);
   loadHistory();
+  // Celebración al enviar el equipo. Si canvas-confetti no cargó, esto no
+  // hace nada y el draft se envía igual.
+  if (window.inazumaCelebrate) window.inazumaCelebrate({ particleCount: 90 });
 };
 
 function confirmFinish() {
@@ -333,6 +344,9 @@ function showResult(st) {
   $('res-chem').textContent = `${st.chem}/33`;
   $('res-rank').textContent = st.rank ? `${st.rank.position}º de ${st.rank.total}` : '—';
   $('result').classList.remove('hidden');
+  // La puntuación sube hasta su valor en vez de aparecer de golpe. Sin GSAP,
+  // countTo escribe el número directamente (que es lo de la línea de arriba).
+  if (window.inazumaMotion) window.inazumaMotion.countTo($('res-score'), st.score);
 }
 
 async function loadHistory() {

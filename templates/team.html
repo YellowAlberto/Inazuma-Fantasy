@@ -85,6 +85,7 @@
   <div class="card-divider"></div>
   <h3>Alineación en el campo ({{ current_formation }})</h3>
   <p class="muted">Haz clic en un jugador del campo para cambiarlo por un suplente de su misma posición.</p>
+  <div class="lineup-layout">
   <div class="pitch">
     <div class="pitch-halfway-line"></div>
     <div class="pitch-center-circle"></div>
@@ -116,25 +117,30 @@
     </div>
     {% endfor %}
   </div>
+
+  {# Panel de afinidad en vivo. Lo rellena team.js con la alineación que
+     tengas puesta en cada momento; el contenido de aquí es el que se ve si
+     JavaScript no llega a ejecutarse. #}
+  <aside class="affinity-panel" id="affinity-panel">
+    <div class="affinity-head">
+      <h4>Afinidad de equipo</h4>
+      <span class="affinity-live" id="affinity-count">—</span>
+    </div>
+    <div id="affinity-body">
+      <p class="muted small">
+        Si 4 o más titulares comparten arquetipo, cada uno gana puntos extra
+        esa jornada (+1 con 4, +2 desde 6) y se activa su efecto en el partido.
+      </p>
+    </div>
+  </aside>
+  </div>
   {% endif %}
 </div>
 
 <script type="application/json" id="squad-data">{{ squad | tojson }}</script>
+<script type="application/json" id="affinity-rules">{{ affinity_rules | tojson }}</script>
+<script type="application/json" id="ui-maps">{{ ui_maps | tojson }}</script>
 <script src="{{ url_for('static', filename='team.js') }}" defer></script>
-
-<div class="card form-card affinity-tip">
-  <h3>🔥 Afinidad de equipo</h3>
-  <p class="muted">Si 4 o más titulares comparten el mismo arquetipo, ganan +1 punto extra cada uno esa jornada (con 6 o más, +2), y además se activa un efecto especial en el partido:</p>
-  <ul class="affinity-effects-list">
-    <li><strong>Justicia</strong> — defensa más sólida: el rival tiene menos probabilidad de marcaros.</li>
-    <li><strong>Contraataque</strong> — más letales al contragolpe cuando tenéis menos posesión que el rival.</li>
-    <li><strong>Juego Sucio</strong> — presión más agresiva: ganáis más robos de balón.</li>
-    <li><strong>Tensión</strong> — rendís mejor en los últimos 20 minutos del partido.</li>
-    <li><strong>Afinidad</strong> — mejor conexión entre compañeros: más pases clave.</li>
-    <li><strong>Brecha</strong> — leéis mejor el juego defensivo: más despejes e intercepciones.</li>
-  </ul>
-  <p class="muted">El arquetipo de cada jugador aparece en su tarjeta.</p>
-</div>
 
 <div class="card form-card affinity-tip">
   <h3>🔒 Cláusulas de rescisión</h3>
@@ -143,7 +149,7 @@
 
 <h2 class="section-title">Tu plantilla ({{ squad|length }} jugadores)</h2>
 <p class="muted">Pasa el ratón sobre un jugador para ver sus puntos por jornada (clic en una jornada para ver las estadísticas de ese partido), o toca la foto/nombre para ver su ficha completa.</p>
-<div class="player-grid">
+<div class="player-grid" data-anim="stagger">
   {% for p in squad %}
   <div class="player-card-wrap">
     <div class="player-card tier-{{ p.price | value_tier }} {{ 'player-card-starter' if p.in_lineup else '' }}">

@@ -22,6 +22,7 @@
   <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">Mi equipo ({{ squad_count }} en plantilla)</a>
   <a href="{{ url_for('standings', league_id=league.id) }}" class="btn btn-secondary">Clasificación</a>
   <a href="{{ url_for('gameweeks', league_id=league.id) }}" class="btn btn-secondary">Jornadas</a>
+  {% if is_creator %}<a href="{{ url_for('league_settings', league_id=league.id) }}" class="btn btn-secondary tab-settings">Ajustes</a>{% endif %}
 </div>
 
 <h2 class="section-title">Entrenadores en esta liga ({{ members|length }}/{{ league.max_members }})</h2>
@@ -39,38 +40,4 @@
   </table>
 </div>
 
-{% if is_creator %}
-<h2 class="section-title">Ajustes</h2>
-<form class="card form-card" method="post" action="{{ url_for('set_discord_webhook', league_id=league.id) }}">
-  <h3>🔔 Avisos en Discord</h3>
-  <p class="muted">
-    Si quieres que esta liga avise en un canal de Discord cada vez que se cierra el mercado o se juega una
-    jornada, pega aquí la URL del webhook de ese canal (en Discord: Ajustes del canal → Integraciones →
-    Webhooks → Nuevo webhook → Copiar URL del webhook). Solo tú, como creador de la liga, puedes verla y
-    cambiarla.
-  </p>
-  <label for="discord_webhook">URL del webhook</label>
-  <input
-    type="url"
-    id="discord_webhook"
-    name="discord_webhook"
-    placeholder="https://discord.com/api/webhooks/..."
-    value="{{ league.discord_webhook or '' }}"
-  >
-  <button class="btn btn-secondary" type="submit">Guardar</button>
-  <p class="muted" style="margin-top: 8px;">
-    {% if league.discord_webhook %}✅ Esta liga tiene un webhook configurado. Borra el campo y guarda para desactivarlo.{% else %}Esta liga no tiene ningún webhook configurado todavía.{% endif %}
-  </p>
-</form>
-
-<h2 class="section-title">Zona de peligro</h2>
-<form class="card form-card danger-zone" method="post" action="{{ url_for('delete_league', league_id=league.id) }}"
-      onsubmit="return confirm('¿Seguro que quieres eliminar esta liga? Se borrarán TODOS sus equipos, pujas y jornadas jugadas. Esta acción no se puede deshacer.');">
-  <h3>Eliminar esta liga</h3>
-  <p class="muted">Esto borra la liga entera para todos sus entrenadores: plantillas, pujas, mercado, jornadas jugadas y clasificación. No se puede deshacer.</p>
-  <label>Escribe el nombre exacto de la liga (<strong>{{ league.name }}</strong>) para confirmar</label>
-  <input type="text" name="confirm_name" placeholder="{{ league.name }}" required>
-  <button class="btn btn-danger" type="submit">🗑️ Eliminar liga definitivamente</button>
-</form>
-{% endif %}
 {% endblock %}

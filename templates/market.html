@@ -72,9 +72,31 @@
 
 <p class="muted player-detail-hint">👆 Toca un personaje para ver sus estadísticas, sus puntos por jornada y la evolución de su valor.</p>
 
-<div class="player-grid">
-  {% for p in players %}
-  <div class="player-card tier-{{ (p.market_value or p.price) | value_tier }}">
+{# Buscador instantáneo sobre los personajes que ya están en pantalla. Lo
+   mueve Alpine.js escribiendo la lógica aquí mismo, sin JavaScript propio.
+   Va oculto con x-cloak: si Alpine no cargase, la caja no llega a aparecer y
+   nadie se encuentra un buscador que no busca. Los filtros de arriba siguen
+   siendo los del servidor, que son los que miran la base de datos entera. #}
+<div x-data="{ q: '' }">
+  {# El x-cloak va SÓLO en la caja, nunca en el envoltorio: si lo llevara el
+     envoltorio y Alpine no cargase, se ocultaría el mercado entero. Así lo
+     único que puede faltar es el buscador. #}
+  <label class="quick-search-box" x-cloak>
+    <span class="quick-search-icon" aria-hidden="true">⌕</span>
+    <input type="search" x-model="q" placeholder="Buscar por nombre entre estos {{ players|length }} personajes…"
+           aria-label="Buscar personaje por nombre">
+    <button type="button" class="quick-search-clear" x-show="q" @click="q = ''" aria-label="Borrar búsqueda">×</button>
+  </label>
+
+  <div class="player-grid" data-anim="stagger">
+    {% for p in players %}
+    {# El nombre viaja en un data- y se compara con $el.dataset, en vez de
+       incrustarlo dentro de la expresión: si se mete con tojson, las comillas
+       dobles del JSON cierran el atributo antes de tiempo y la condición
+       queda partida por la mitad. #}
+    <div class="player-card tier-{{ (p.market_value or p.price) | value_tier }}"
+         data-name="{{ p.nombre | lower }}"
+         x-show="q === '' || $el.dataset.name.includes(q.toLowerCase().trim())">
     <div class="player-card-clickable" data-player-id="{{ p.id }}" data-league-id="{{ league.id }}" role="button" tabindex="0">
       <div class="player-card-top">
         <span class="player-position-badge" title="{{ position_labels[p.posicion] }}">{{ p.posicion }}</span>
@@ -120,7 +142,8 @@
     </form>
     {% endif %}
     {% endif %}
+    </div>
+    {% endfor %}
   </div>
-  {% endfor %}
 </div>
 {% endblock %}

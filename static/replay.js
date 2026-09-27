@@ -380,6 +380,28 @@ document.addEventListener('DOMContentLoaded', function () {
       el.classList.remove('goal-flash-active');
       void el.offsetWidth; // force reflow so the animation can restart
       el.classList.add('goal-flash-active');
+
+      // Confeti sobre la portería donde ha entrado el gol. Si el CDN no cargó,
+      // inazumaCelebrate no existe y el gol se ve igual que antes.
+      if (!window.inazumaCelebrate) return;
+      var box = el.getBoundingClientRect();
+      if (!box.width || !box.height) return;
+
+      // canvas-confetti sitúa el origen en coordenadas de pantalla (0 a 1). Si
+      // el campo está fuera del scroll, el confeti saldría donde nadie lo ve,
+      // así que no se lanza; y si se ve a medias, se recorta a la parte visible.
+      var vh = window.innerHeight || 1;
+      var vw = window.innerWidth || 1;
+      if (box.bottom < 0 || box.top > vh) return;
+      window.inazumaCelebrate({
+        particleCount: 45,
+        spread: 60,
+        scalar: 0.8,
+        origin: {
+          x: Math.min(1, Math.max(0, (box.left + box.width / 2) / vw)),
+          y: Math.min(1, Math.max(0, (box.top + box.height / 2) / vh))
+        }
+      });
     }
 
     function resetAllBadges() {

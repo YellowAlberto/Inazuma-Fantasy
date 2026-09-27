@@ -18,7 +18,12 @@
 .draft-page * { box-sizing: border-box; }
 .draft-page {
   margin: 0; color: var(--text);
-  font-family: 'Rajdhani', 'Segoe UI', system-ui, sans-serif; font-size: 16px;
+  /* Antes aquí iba Rajdhani. Su "o" minúscula es un rectángulo redondeado
+     casi idéntico a su "a", y a tamaño pequeño "Draft diario" se leía como
+     "Draft diaria". Se usa la misma fuente de texto que el resto del sitio,
+     que además quita una fuente que descargar. Los titulares y los números
+     grandes siguen en Bebas Neue: van en mayúsculas y no tienen ese problema. */
+  font-family: var(--font-body, 'Inter', 'Segoe UI', system-ui, sans-serif); font-size: 16px;
   background: radial-gradient(1200px 600px at 50% -200px, #22306a 0%, var(--bg) 60%);
   border-radius: 18px; padding: 4px;
 }

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Ajustes · {{ league.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Ajustes de la liga</h1>
+    <div class="meta-chips">
+      <span class="meta-chip">Liga <strong>{{ league.name }}</strong></span>
+      <span class="meta-chip meta-chip-code">Código <strong>{{ league.invite_code }}</strong></span>
+      <span class="meta-chip">Jornada <strong>{{ league.current_gameweek }}</strong></span>
+    </div>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
+  </div>
+</div>
+
+<h2 class="section-title">Avisos en Discord</h2>
+<form class="card form-card" method="post" action="{{ url_for('set_discord_webhook', league_id=league.id) }}">
+  <p class="muted" style="margin-top: 0;">
+    Esta liga puede avisar en un canal de Discord cada vez que se cierra el mercado o se juega una jornada.
+    Para conseguir la dirección: en Discord, <strong>Ajustes del canal → Integraciones → Webhooks →
+    Nuevo webhook → Copiar URL</strong>. Solo tú, como creador, puedes verla y cambiarla.
+  </p>
+  <label for="discord_webhook">URL del webhook</label>
+  <input
+    type="url"
+    id="discord_webhook"
+    name="discord_webhook"
+    placeholder="https://discord.com/api/webhooks/..."
+    value="{{ league.discord_webhook or '' }}"
+  >
+  <div class="settings-actions">
+    <button class="btn btn-primary" type="submit">Guardar</button>
+    <span class="settings-state {{ 'on' if league.discord_webhook else '' }}">
+      {% if league.discord_webhook %}
+        Activado. Vacía el campo y guarda para desactivarlo.
+      {% else %}
+        Sin configurar: esta liga no avisa en ningún canal.
+      {% endif %}
+    </span>
+  </div>
+</form>
+
+<h2 class="section-title">Zona de peligro</h2>
+<p class="muted">Estas dos acciones no se pueden deshacer. Solo tú las ves.</p>
+
+<div class="danger-stack">
+  {% if not league.ended %}
+  <form class="card form-card danger-zone" method="post" action="{{ url_for('end_league', league_id=league.id) }}"
+        onsubmit="return confirm('¿Seguro que quieres finalizar la liga ya? No podréis jugar más jornadas.');">
+    <h3>Finalizar la liga</h3>
+    <p class="muted">
+      Termina la liga ahora mismo, aunque no se haya llegado
+      {% if max_gameweeks %}a la jornada {{ max_gameweeks }}{% else %}al final{% endif %}.
+      Se declara campeón a quien vaya primero en la clasificación en ese momento.
+      Los equipos y los resultados se conservan.
+    </p>
+    <button class="btn btn-danger" type="submit">Finalizar liga ahora</button>
+  </form>
+  {% else %}
+  <div class="card">
+    <h3>Liga finalizada</h3>
+    <p class="muted">Esta liga ya está terminada, así que no se pueden jugar más jornadas.</p>
+  </div>
+  {% endif %}
+
+  <form class="card form-card danger-zone" method="post" action="{{ url_for('delete_league', league_id=league.id) }}"
+        onsubmit="return confirm('¿Seguro que quieres eliminar esta liga? Se borrarán TODOS sus equipos, pujas y jornadas jugadas. Esta acción no se puede deshacer.');">
+    <h3>Eliminar esta liga</h3>
+    <p class="muted">
+      Borra la liga entera para todos sus entrenadores: plantillas, pujas, mercado, jornadas jugadas
+      y clasificación. Esto sí se pierde para siempre.
+    </p>
+    <label for="confirm_name">Escribe <strong>{{ league.name }}</strong> para confirmar</label>
+    <input type="text" id="confirm_name" name="confirm_name" placeholder="{{ league.name }}" required autocomplete="off">
+    <button class="btn btn-danger" type="submit">Eliminar liga definitivamente</button>
+  </form>
+</div>
+{% endblock %}

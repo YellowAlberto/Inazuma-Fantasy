@@ -4,64 +4,99 @@
 <div class="page-header">
   <div>
     <h1>Jornadas</h1>
-    <p class="muted">
-      {{ league.name }} · Jornada actual: {{ league.current_gameweek }}{% if max_gameweeks %} de {{ max_gameweeks }}{% endif %}
-    </p>
+    <div class="meta-chips">
+      <span class="meta-chip">Liga <strong>{{ league.name }}</strong></span>
+      <span class="meta-chip">Jornada <strong>{{ league.current_gameweek }}{% if max_gameweeks %} de {{ max_gameweeks }}{% endif %}</strong></span>
+      <span class="meta-chip">Jugadas <strong>{{ gameweeks|length }}</strong></span>
+    </div>
   </div>
   <a href="{{ url_for('league_detail', league_id=league.id) }}" class="btn btn-ghost">← Volver a la liga</a>
 </div>
 
 {% if league.ended %}
-<div class="card" style="border-color: var(--orange);">
-  <h3>🏆 Liga finalizada</h3>
-  <p>Campeón: {% if champion and champion.avatar_sprite_url %}<img src="{{ champion.avatar_sprite_url }}" alt="" class="standings-avatar">{% endif %} <strong>{{ champion.team_name if champion else '—' }}</strong>{% if champion %} ({{ champion.total_points }} puntos){% endif %}</p>
+<div class="card champion-card">
+  <div class="champion-icon">🏆</div>
+  <div>
+    <div class="champion-label">Liga finalizada · Campeón</div>
+    <div class="champion-name">
+      {% if champion and champion.avatar_sprite_url %}<img src="{{ champion.avatar_sprite_url }}" alt="" class="standings-avatar">{% endif %}
+      {{ champion.team_name if champion else '—' }}
+      {% if champion %}<span class="muted">· {{ champion.total_points }} puntos</span>{% endif %}
+    </div>
+  </div>
 </div>
 {% endif %}
 
 {% if is_creator and not league.ended %}
-<div class="card form-card">
-  <h3>🗓️ Horario automático</h3>
-  <p class="muted">Si has configurado la tarea programada, esta liga funciona sola: de lunes a viernes el mercado rota cada día a las 20:00 (hora española), y viernes, sábado y domingo a esa misma hora se juega una jornada. Los botones de abajo siguen disponibles por si quieres adelantarte manualmente.</p>
+{# Las dos acciones que hacen avanzar la liga van juntas en un solo bloque:
+   son el mismo trabajo (empujar la semana) y antes estaban en dos cajas
+   idénticas y separadas, que era lo que hacía la página pesada. #}
+<h2 class="section-title">Avanzar la liga</h2>
+<div class="card advance-card">
+  <div class="advance-grid">
+    <div class="advance-step">
+      <div class="advance-step-num">1</div>
+      <div class="advance-step-body">
+        <h3>Cerrar el mercado</h3>
+        <p class="muted">
+          {% if market_count %}
+            Hay <strong>{{ market_count }}</strong> personajes con pujas abiertas. Al cerrarlo se revela quién
+            ganó cada puja y se abre uno nuevo al momento.
+          {% else %}
+            No hay ningún personaje en el mercado ahora mismo.
+          {% endif %}
+        </p>
+        <form method="post" action="{{ url_for('resolve_market', league_id=league.id) }}">
+          <button class="btn btn-secondary" type="submit" {{ 'disabled' if not market_count else '' }}>
+            Cerrar y repartir
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="advance-step">
+      <div class="advance-step-num">2</div>
+      <div class="advance-step-body">
+        <h3>Jugar la jornada {{ league.current_gameweek + 1 }}</h3>
+        <p class="muted">
+          Se calculan los puntos con la alineación que cada entrenador tenga puesta ahora mismo. Quien no
+          tenga un once válido puntuará 0. No hace falta cerrar el mercado antes.
+        </p>
+        <form method="post" action="{{ url_for('advance_gameweek', league_id=league.id) }}">
+          <button class="btn btn-primary" type="submit">Jugar jornada {{ league.current_gameweek + 1 }}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <p class="advance-note">
+    Si tienes la tarea programada activa, esto va solo: de lunes a viernes el mercado rota cada día a las
+    20:00 (hora española), y viernes, sábado y domingo a esa hora se juega una jornada. Estos botones son
+    solo para adelantarte.
+  </p>
 </div>
-
-<form class="card form-card" method="post" action="{{ url_for('resolve_market', league_id=league.id) }}">
-  <h3>🔨 Cerrar el mercado ahora</h3>
-  <p class="muted">Hay {{ market_count }} personajes con pujas abiertas en el mercado de hoy. Al cerrarlo se revela quién ganó cada puja y se abre inmediatamente un mercado nuevo.</p>
-  <button class="btn btn-primary" type="submit">Cerrar mercado y repartir jugadores</button>
-</form>
-
-<form class="card form-card" method="post" action="{{ url_for('advance_gameweek', league_id=league.id) }}">
-  <h3>▶️ Jugar la jornada ahora</h3>
-  <p class="muted">Se calculan los puntos de la alineación titular de cada entrenador con lo que tenga fichado ahora mismo (los que no tengan una alineación válida puntuarán 0 esta jornada). No hace falta cerrar el mercado antes.</p>
-  <button class="btn btn-primary" type="submit">Jugar jornada {{ league.current_gameweek + 1 }}</button>
-</form>
-
-<form class="card form-card" method="post" action="{{ url_for('end_league', league_id=league.id) }}" onsubmit="return confirm('¿Seguro que quieres finalizar la liga ya? No podréis jugar más jornadas.');">
-  <h3>🏁 Finalizar la liga</h3>
-  <p class="muted">Termina la liga ya mismo, aunque no se haya llegado a la jornada {{ max_gameweeks or '—' }}. Se declara campeón a quien vaya primero en la clasificación en ese momento.</p>
-  <button class="btn btn-danger" type="submit">Finalizar liga ahora</button>
-</form>
 {% endif %}
 
-<div class="card">
-  {% if not gameweeks %}
+<h2 class="section-title">Jornadas jugadas</h2>
+{% if not gameweeks %}
+  <div class="card">
     <div class="empty-box">
       <div class="empty-box-icon">📅</div>
-      <p>Todavía no se ha jugado ninguna jornada.</p>
+      <p>Todavía no se ha jugado ninguna jornada. En cuanto se juegue la primera aparecerá aquí con sus resultados.</p>
     </div>
-  {% else %}
-  <table class="simple-table">
-    <thead><tr><th>Jornada</th><th>Fecha</th><th></th></tr></thead>
-    <tbody>
-      {% for gw in gameweeks %}
-      <tr>
-        <td>Jornada {{ gw.number }}</td>
-        <td>{{ gw.played_at }}</td>
-        <td><a class="btn btn-secondary" href="{{ url_for('gameweek_detail', league_id=league.id, number=gw.number) }}">Ver resultados</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-</div>
+  </div>
+{% else %}
+  <div class="gw-list">
+    {% for gw in gameweeks %}
+    <a class="gw-row" href="{{ url_for('gameweek_detail', league_id=league.id, number=gw.number) }}">
+      <span class="gw-num">{{ gw.number }}</span>
+      <span class="gw-body">
+        <span class="gw-title">Jornada {{ gw.number }}</span>
+        <span class="gw-date">{{ gw.played_at }}</span>
+      </span>
+      <span class="gw-go">Ver resultados →</span>
+    </a>
+    {% endfor %}
+  </div>
+{% endif %}
 {% endblock %}

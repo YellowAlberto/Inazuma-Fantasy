@@ -6,7 +6,7 @@
   <title>{% block title %}Inazuma Fantasy{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   {% block extra_head %}{% endblock %}
 </head>
@@ -73,6 +73,18 @@
       </div>
     </div>
   </div>
+  {# Librerías de la capa visual, desde CDN y con defer.
+     Las tres son OPCIONALES: si alguna no llega, la web sigue funcionando
+     igual, sólo sin animación. Nada del sitio depende de ellas para verse.
+       · GSAP           — reparto de cartas y contadores
+       · canvas-confetti — celebración al terminar un draft y en los goles
+       · Alpine.js      — buscador instantáneo del mercado
+     Van antes que los scripts propios porque con defer se ejecutan en orden,
+     y draft.js / motion.js las necesitan ya cargadas. #}
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/canvas-confetti/1.9.3/confetti.browser.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.14.1/cdn.min.js"></script>
+  <script src="{{ url_for('static', filename='motion.js') }}" defer></script>
   <script src="{{ url_for('static', filename='player-detail.js') }}" defer></script>
   {% block extra_scripts %}{% endblock %}
 
