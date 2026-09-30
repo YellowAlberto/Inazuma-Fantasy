@@ -190,6 +190,24 @@ SUPER_TECHNIQUE_CHANCE = 0.05
 # gol cobra el gol, una de portería cobra la parada). Estos 2 puntos van
 # encima, a propósito: premian la jugada en sí. El regate era el único tipo
 # que no daba absolutamente nada, y ahora también cuenta.
+# Los defensas tocan menos el balón que los medios (1,21 frente a 1,79 pases
+# por partido), así que los pases NO sirven para cerrar la diferencia entre
+# ambos: lo que arreglan es la tarjeta vacía. Contando los pases, las jornadas
+# en que un jugador aparece sin haber hecho nada caen del 15% al 2% en los
+# defensas y del 26% al 5% en los delanteros.
+#
+# Cuentan los pases dados Y los recibidos: contando solo los dados se quedaban
+# fuera los defensas, que reciben más de lo que dan (0,92 frente a 0,61) por
+# ser la salida segura del equipo.
+PASS_POINTS_PER_UNIT = 3   # cada N pases, 1 punto
+PASS_POINTS_CAP = 9        # pases que cuentan para puntos, o sea 3 como tope
+# Sólo puntúan para defensas y medios. El delantero ya tiene el gol como vía
+# de puntos, y esto existe justamente para los que no la tienen.
+PASS_POINTS_POSITIONS = ("DF", "MF")
+# Cuánto más probable es que corte el pase un medio que un defensa. Sin esto
+# los defensas se llevaban el 61% de las intercepciones por pura cercanía.
+INTERCEPTION_MF_EDGE = 1.5
+
 SUPER_TECHNIQUE_POINTS = 2
 SUPER_TECHNIQUE_POINTS_CAP = 3  # en 500 partidos nadie paso de 3, es un seguro
 
@@ -360,7 +378,7 @@ class _PlayerLog:
     """Accumulates raw match events for one player as the simulation runs."""
 
     __slots__ = ("player", "goals", "assists", "saves", "steals", "losses", "key_passes",
-                 "clearances", "interceptions", "blocks", "super_techniques")
+                 "clearances", "interceptions", "blocks", "super_techniques", "passes")
 
     def __init__(self, player):
         self.player = player
@@ -374,6 +392,7 @@ class _PlayerLog:
         self.interceptions = 0
         self.blocks = 0
         self.super_techniques = 0
+        self.passes = 0
 
 
 def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marking_memory=False):
@@ -506,7 +525,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
         # this new spot, not the old one.
         ball_y = side["y_positions"].get(attacker["id"], ball_y)
 
-        if roll < 0.28:
+        if roll < 0.22:
             # Buildup pass: the ball carrier usually looks to pass it on —
             # most often a short, safe ball to whoever's nearest, with a
             # smaller chance of a longer diagonal ball / switch of play to
@@ -527,6 +546,10 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             # the side's next logged action should usually revolve around.
             side["possessor_id"] = recipient["id"] if recipient is not None else attacker["id"]
 
+            # El pase cuenta para quien lo da y para quien lo recibe.
+            side["logs"][attacker["id"]].passes += 1
+            if recipient is not None:
+                side["logs"][recipient["id"]].passes += 1
             side["last_passer"] = attacker
             # Afinidad: sharp team chemistry turns some routine passes into
             # genuine chances on their own — but only counts as a real "key
@@ -547,7 +570,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         {"minute": minute, "type": "key_pass", "side": side_key, "player": attacker["nombre"], "player_id": attacker["id"], "sprite_url": attacker.get("sprite_url"), "recipient": recipient["nombre"], "recipient_id": recipient["id"]},
                     ))
 
-        elif roll < 0.40:
+        elif roll < 0.34:
             # Key pass: a playmaker threads a dangerous ball through to a
             # specific teammate. Earns a small reward on its own, counts as
             # a strong assist setup, and primes that recipient for a
@@ -578,7 +601,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     {"minute": minute, "type": "key_pass", "side": side_key, "player": passer["nombre"], "player_id": passer["id"], "sprite_url": passer.get("sprite_url"), "recipient": recipient["nombre"], "recipient_id": recipient["id"]},
                 ))
 
-        elif roll < 0.60:
+        elif roll < 0.54:
             # A defender/midfielder from the other side tries a tackle.
             # Assume the attacker rides the challenge out and keeps the ball
             # unless one of the branches below says otherwise.
@@ -676,7 +699,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                             ))
             side["last_passer"] = None
 
-        elif roll < 0.72:
+        elif roll < 0.66:
             # Clearance: a defender (or keeper) under pressure just hoofs
             # the ball away rather than risking a pass — it's an unaimed
             # ball upfield, so it mostly falls to the pressing side (who
@@ -714,9 +737,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             side["last_passer"] = None
 
         elif roll < 0.82:
-            # Interception: a midfielder reads the game and cuts out the pass.
+            # Intercepción: alguien lee el pase y lo corta. Antes esto estaba
+            # reservado a los centrocampistas, y era la razón de que un defensa
+            # apareciese sin hacer nada en el 15% de las jornadas: la acción
+            # defensiva más frecuente del partido le estaba vetada. Ahora
+            # entran también los defensas, con ventaja para el medio, que es
+            # a quien le corresponde por oficio.
             intercept_pool = _nearby_pool(
-                [p for p in other["lineup"] if p["posicion"] == "MF"] or other["outfield"],
+                [p for p in other["lineup"] if p["posicion"] in ("DF", "MF")] or other["outfield"],
                 ball_y,
                 other["y_positions"],
             )
@@ -730,7 +758,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     defender = _pick_weighted(
                         intercept_pool,
                         lambda p: (_normalize_stat(p["inteligencia"]) + _normalize_stat(p["presion"]))
-                        * _proximity_weight(attacker_y, other["y_positions"].get(p["id"])),
+                        * _proximity_weight(attacker_y, other["y_positions"].get(p["id"]))
+                        * (INTERCEPTION_MF_EDGE if p["posicion"] == "MF" else 1.0),
                     )
                     if other["marking"]:
                         other["marking"].assign(attacker["id"], defender["id"])
@@ -1008,6 +1037,16 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 if pts:
                     points += pts
                     breakdown.append(f"🚧 {log.blocks} bloqueo{'s' if log.blocks > 1 else ''} (+{pts})")
+            if log.passes:
+                counted = min(log.passes, PASS_POINTS_CAP) if pos in PASS_POINTS_POSITIONS else 0
+                pts = counted // PASS_POINTS_PER_UNIT
+                points += pts
+                # La línea sale aunque no dé puntos: lo que hacía que la
+                # tarjeta pareciese vacía era no ver nada, no el marcador.
+                extra = f" (+{pts})" if pts else ""
+                breakdown.append(
+                    f"\U0001F517 {log.passes} pase{'s' if log.passes > 1 else ''}{extra}"
+                )
             if log.super_techniques:
                 counted = min(log.super_techniques, SUPER_TECHNIQUE_POINTS_CAP)
                 pts = counted * SUPER_TECHNIQUE_POINTS
@@ -1045,6 +1084,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 "key_passes": log.key_passes,
                 "losses": log.losses,
                 "super_techniques": log.super_techniques,
+                "passes": log.passes,
                 "clean_sheet": 1 if clean_sheet_applied else 0,
             }
             total_points += points

@@ -591,13 +591,14 @@ def play_gameweek_for_league(db, league_id):
                     "INSERT INTO gameweek_scores "
                     "(gameweek_id, league_id, user_id, player_id, points, events, "
                     " goals, assists, saves, steals, interceptions, clearances, key_passes, losses, clean_sheet, blocks, "
-                    " is_captain, base_points, super_techniques) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " is_captain, base_points, super_techniques, passes) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         gameweek_id, league_id, user_id, p["id"], pts, "|".join(breakdown),
                         r["goals"], r["assists"], r["saves"], r["steals"], r["interceptions"],
                         r["clearances"], r["key_passes"], r["losses"], r["clean_sheet"], r["blocks"],
                         1 if is_captain else 0, raw_points, r.get("super_techniques", 0),
+                        r.get("passes", 0),
                     ),
                 )
 
