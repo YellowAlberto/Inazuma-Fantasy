@@ -7,6 +7,7 @@ un import circular."""
 import functools
 import json
 import os
+from datetime import datetime
 
 try:
     from zoneinfo import ZoneInfo
@@ -202,6 +203,40 @@ def format_euros(points):
 def euros_filter(points):
     return format_euros(points)
 
+
+
+def hace_filter(stamp):
+    """'hace 5 min', 'hace 3 h', 'hace 2 días'... para el historial de la liga.
+
+    SQLite guarda CURRENT_TIMESTAMP en UTC y sin zona, así que se compara
+    contra utcnow(). Si la cadena no se puede leer se devuelve tal cual, que
+    es mejor que romper la página por una fecha rara."""
+    if not stamp:
+        return ""
+    try:
+        cuando = datetime.strptime(str(stamp)[:19], "%Y-%m-%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return str(stamp)
+
+    segundos = (datetime.utcnow() - cuando).total_seconds()
+    if segundos < 0:
+        segundos = 0  # relojes desajustados: nada de "hace -3 min"
+
+    minutos = segundos / 60
+    if minutos < 1:
+        return "ahora mismo"
+    if minutos < 60:
+        n = int(minutos)
+        return f"hace {n} min"
+    horas = minutos / 60
+    if horas < 24:
+        n = int(horas)
+        return f"hace {n} hora{'s' if n != 1 else ''}"
+    dias = int(horas / 24)
+    if dias < 30:
+        return f"hace {dias} día{'s' if dias != 1 else ''}"
+    meses = dias // 30
+    return f"hace {meses} mes{'es' if meses != 1 else ''}"
 
 
 def euromillions_filter(points):

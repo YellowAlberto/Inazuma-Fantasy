@@ -998,6 +998,54 @@ a.card:hover, .league-card:hover {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  position: relative;   /* ancla de la chapa del capitán */
+}
+
+/* Brazalete de capitán. Sólo se ve en el titular que lo lleva; el resto de
+   casillas la tienen puesta pero oculta, así que darle el brazalete a otro
+   es cambiar una clase y no tocar el DOM. */
+.captain-badge {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  margin-left: 12px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--navy-900);
+  border: 2px solid var(--navy-900);
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  letter-spacing: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  display: none;
+  z-index: 3;
+}
+.pitch-player.is-captain .captain-badge { display: block; }
+/* Amarillo, no naranja: el aro naranja lo llevan ya todos los titulares, así
+   que en naranja el capitán no se distinguía del resto. */
+.pitch-player.is-captain .pitch-player-badge {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.35);
+}
+
+/* La opción de nombrar capitán, arriba del menú de cambios. */
+.pitch-swap-captain { font-weight: 700; }
+.pitch-swap-c {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: var(--yellow);
+  color: var(--navy-900);
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .pitch-player-badge {
   width: 46px; height: 46px;
@@ -1891,3 +1939,277 @@ a.card:hover, .league-card:hover {
 }
 .modal-player-name { font-size: 0.75rem; font-weight: 600; }
 .modal-player-pos { font-size: 0.7rem; color: var(--text-muted); }
+
+/* ---------------------------------------------------------------------------
+   Historial de la liga
+   Una línea por cosa que ha pasado. La barra de color a la izquierda depende
+   del tipo, para poder distinguir de un vistazo un fichaje de una cláusula
+   sin tener que leer el texto.
+--------------------------------------------------------------------------- */
+.league-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 3px 12px 3px 12px;
+}
+.feed-icon {
+  font-size: 1.05rem;
+  line-height: 1.3;
+  flex: 0 0 auto;
+}
+.feed-body { min-width: 0; }
+.feed-text {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-light);
+}
+.feed-meta {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.feed-fichaje  { border-left-color: var(--green); }
+.feed-clausula { border-left-color: var(--red); }
+.feed-venta    { border-left-color: var(--blue-accent); }
+.feed-jornada  { border-left-color: var(--orange); }
+.feed-liga     { border-left-color: var(--yellow); }
+.feed-mercado  { border-left-color: var(--blue-accent-dark); }
+
+@media (max-width: 520px) {
+  .feed-item { padding: 9px 11px; gap: 9px; }
+  .feed-text { font-size: 0.86rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   Once ideal y MVP de la jornada
+--------------------------------------------------------------------------- */
+.mvp-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.mvp-badge {
+  width: 72px; height: 72px;
+  flex: 0 0 72px;
+  border-radius: 50%;
+  background: var(--navy-900);
+  border: 3px solid var(--yellow);
+  box-shadow: 0 0 0 4px rgba(255, 210, 63, 0.18);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.mvp-badge img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.mvp-info { min-width: 0; flex: 1; }
+.mvp-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--yellow);
+  font-weight: 700;
+}
+.mvp-name { margin: 1px 0 2px; font-size: 1.15rem; }
+.mvp-meta { margin: 0; font-size: 0.78rem; color: var(--text-muted); }
+.mvp-points {
+  flex: 0 0 auto;
+  text-align: center;
+  padding: 8px 16px;
+  background: var(--sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px 12px 3px 12px;
+}
+.mvp-points strong { display: block; font-size: 1.5rem; color: var(--yellow); line-height: 1; }
+.mvp-points span { font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; }
+
+/* En el once ideal no se hace clic en nadie: no es tu alineación. */
+.pitch-player-static { cursor: default; }
+.pitch-player-static:hover .pitch-player-badge { transform: none; box-shadow: none; }
+.best-pts {
+  margin-top: 1px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: var(--navy-900);
+  background: var(--yellow);
+  border-radius: 6px;
+  padding: 0 6px;
+  line-height: 15px;
+}
+
+@media (max-width: 520px) {
+  .mvp-row { gap: 11px; }
+  .mvp-badge { width: 56px; height: 56px; flex-basis: 56px; }
+  .mvp-name { font-size: 1rem; }
+  .mvp-points { padding: 6px 11px; }
+  .mvp-points strong { font-size: 1.25rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   Chip del código de liga, que además copia al portapapeles
+   El aviso de "¡Copiado!" se superpone en vez de sustituir el texto, para que
+   el chip no cambie de ancho y no dé el salto al pulsarlo.
+--------------------------------------------------------------------------- */
+.meta-chip-copy {
+  position: relative;
+  cursor: pointer;
+  font-family: inherit;
+  align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.meta-chip-copy:hover { border-color: var(--orange); }
+.meta-chip-copy:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+.meta-chip-copy .copy-icon {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+  transition: color 0.15s ease;
+}
+.meta-chip-copy:hover .copy-icon { color: var(--orange); }
+
+.copy-flash {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.copy-flash-ok { background: var(--green); color: #04240f; }
+.copy-flash-ko { background: var(--yellow); color: var(--navy-900); }
+.meta-chip-copy.is-copied .copy-flash-ok { display: flex; }
+.meta-chip-copy.is-copy-failed .copy-flash-ko { display: flex; }
+.meta-chip-copy.is-copied { border-color: var(--green); }
+.meta-chip-copy.is-copy-failed { border-color: var(--yellow); }
+
+/* ---------------------------------------------------------------------------
+   De quién es cada jugador del once ideal
+   En el campo sólo cabe el nombre del equipo (las etiquetas se cortan a unos
+   80px), así que el entrenador va en la leyenda de debajo y en el tooltip.
+--------------------------------------------------------------------------- */
+/* Píldora oscura detrás: el nombre del equipo cae a veces encima del círculo
+   central o de una línea del área, y sin fondo ahí no se leía. */
+.best-team {
+  margin-top: 2px;
+  font-size: 0.6rem;
+  color: #e6ecff;
+  background: rgba(5, 10, 30, 0.72);
+  padding: 0 5px;
+  border-radius: 6px;
+  line-height: 14px;
+  max-width: 86px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Los once del once ideal, uno a uno y de más a menos puntos, para ver de un
+   vistazo quiénes fueron los que más puntuaron y de quién son. */
+.best-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  counter-reset: none;
+}
+.best-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: 2px 10px 2px 10px;
+  font-size: 0.82rem;
+}
+/* Los tres primeros destacan, igual que en las clasificaciones. */
+.best-list-item:nth-child(1) { border-left: 3px solid var(--yellow); }
+.best-list-item:nth-child(2) { border-left: 3px solid #c8d2ea; }
+.best-list-item:nth-child(3) { border-left: 3px solid #d08a4a; }
+
+.best-list-rank {
+  flex: 0 0 18px;
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.best-list-sprite {
+  width: 28px; height: 28px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.best-list-sprite-empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem;
+}
+.best-list-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.best-list-pos {
+  flex: 0 0 auto;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  padding: 0 5px;
+  line-height: 16px;
+}
+.best-list-owner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.72rem;
+  text-align: right;
+}
+.best-list-owner a { color: var(--text-muted); text-decoration: none; }
+.best-list-owner a:hover { color: var(--orange); }
+.best-list-user { color: var(--blue-accent); }
+.best-list-pts {
+  flex: 0 0 34px;
+  text-align: right;
+  font-weight: 800;
+  color: var(--yellow);
+  font-variant-numeric: tabular-nums;
+}
+
+.mvp-user { color: var(--text-muted); }
+
+@media (max-width: 520px) {
+  .best-team { font-size: 0.55rem; max-width: 62px; }
+  /* En el móvil, equipo y entrenador se van a su propia línea: en una sola
+     fila no caben con el nombre y lo dejaban en "Bryce W...". */
+  .best-list-item { font-size: 0.78rem; padding: 6px 9px; gap: 7px; flex-wrap: wrap; }
+  .best-list-rank { display: none; }
+  .best-list-sprite { width: 24px; height: 24px; }
+  .best-list-owner {
+    order: 10;              /* después de los puntos, así queda sola abajo */
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding-left: 31px;     /* alineado con el nombre, tras el sprite */
+    font-size: 0.66rem;
+  }
+}

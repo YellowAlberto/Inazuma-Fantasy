@@ -23,6 +23,7 @@ from core import (
 from league_engine import (
     default_clause_value,
     league_is_old_enough_for_clauses,
+    log_league_event,
     maybe_add_cpu_offer,
     pending_bids_total,
     squad_spent,
@@ -31,6 +32,7 @@ from scoring import (
     AFFINITY_BONUS_PLAYER_CAP,
     AFFINITY_EFFECTS,
     AFFINITY_SCALE_CAP,
+    CAPTAIN_MULTIPLIER,
     AFFINITY_SCALE_PER_EXTRA_PLAYER,
     AFFINITY_THRESHOLDS,
     DEFAULT_FORMATION,
@@ -131,15 +133,15 @@ def register_team_routes(app):
                 (league_id, session["user_id"]),
             ).fetchall()
         )
-        lineup_ids = {
-            r["player_id"]
-            for r in db.execute(
-                "SELECT player_id FROM lineup_selections WHERE league_id = ? AND user_id = ?",
-                (league_id, session["user_id"]),
-            ).fetchall()
-        }
+        lineup_rows = db.execute(
+            "SELECT player_id, is_captain FROM lineup_selections WHERE league_id = ? AND user_id = ?",
+            (league_id, session["user_id"]),
+        ).fetchall()
+        lineup_ids = {r["player_id"] for r in lineup_rows}
+        captain_id = next((r["player_id"] for r in lineup_rows if r["is_captain"]), None)
         for p in squad:
             p["in_lineup"] = p["id"] in lineup_ids
+            p["is_captain"] = p["id"] == captain_id
 
         # Per-gameweek points history for each squad player, for the hover
         # tooltip on their card (regardless of who fielded them that week).
@@ -214,6 +216,8 @@ def register_team_routes(app):
             bonus_budget=round(bonus_budget),
             remaining=round(league["budget"] + bonus_budget - spent),
             pitch_rows=pitch_rows,
+            captain_id=captain_id,
+            captain_multiplier=CAPTAIN_MULTIPLIER,
         )
 
 
@@ -294,11 +298,24 @@ def register_team_routes(app):
             "UPDATE league_members SET formation = ? WHERE league_id = ? AND user_id = ?",
             (formation, league_id, session["user_id"]),
         )
+        # El capitán tiene que ser uno de los que acaban siendo titulares. Si
+        # el que venía marcado se ha quedado en el banquillo (por un cambio de
+        # formación, por ejemplo) el brazalete pasa al titular más caro, para
+        # que nunca se juegue una jornada sin capitán sin querer.
+        try:
+            captain_id = int(request.form.get("captain_id") or 0)
+        except ValueError:
+            captain_id = 0
+        if captain_id not in kept_ids:
+            titulares = [by_id.get(pid) or next((p for p in full_squad if p["id"] == pid), None) for pid in kept_ids]
+            titulares = [p for p in titulares if p]
+            captain_id = max(titulares, key=lambda p: p["price"])["id"] if titulares else 0
+
         db.execute("DELETE FROM lineup_selections WHERE league_id = ? AND user_id = ?", (league_id, session["user_id"]))
         for pid in kept_ids:
             db.execute(
-                "INSERT INTO lineup_selections (league_id, user_id, player_id) VALUES (?, ?, ?)",
-                (league_id, session["user_id"], pid),
+                "INSERT INTO lineup_selections (league_id, user_id, player_id, is_captain) VALUES (?, ?, ?, ?)",
+                (league_id, session["user_id"], pid, 1 if pid == captain_id else 0),
             )
         db.commit()
 
@@ -369,8 +386,15 @@ def register_team_routes(app):
         # (including any CPU offer) don't get silently wiped by the next cycle.
         db.execute("UPDATE leagues SET market_resolved = 0 WHERE id = ?", (league_id,))
 
-        db.commit()
         name = player["nombre"] if player else "El jugador"
+        log_league_event(
+            db, league_id, "venta",
+            f"{membership['team_name']} deja libre a {name}, que vuelve al mercado",
+            gameweek_number=league["current_gameweek"],
+            player_id=player_id, user_id=session["user_id"],
+        )
+
+        db.commit()
         flash(f"{name} ha vuelto al mercado — cualquiera de la liga puede pujar por él ahora.", "success")
         if cpu_offer:
             flash(f"📡 Un comprador de fuera de la liga (CPU) ha hecho una oferta sellada por {name}. ¡Puja para no perderlo!", "success")
@@ -486,9 +510,18 @@ def register_team_routes(app):
         # Also remove it from the open market/bids if it happened to be listed there.
         db.execute("DELETE FROM league_market WHERE league_id = ? AND player_id = ?", (league_id, player_id))
         db.execute("DELETE FROM bids WHERE league_id = ? AND player_id = ?", (league_id, player_id))
-        db.commit()
 
         old_team_name = old_team["team_name"] if old_team else "otro equipo"
+        log_league_event(
+            db, league_id, "clausula",
+            f"{membership['team_name']} paga la cláusula de {player['nombre']} "
+            f"({round(clause_value)}) y se lo quita a {old_team_name}",
+            gameweek_number=league["current_gameweek"],
+            player_id=player_id, user_id=session["user_id"],
+            from_user_id=old_user_id, amount=round(clause_value),
+        )
+        db.commit()
+
         flash(
             f"¡Le has pagado la cláusula de {round(clause_value)} a {player['nombre']} y se lo has robado a {old_team_name}!",
             "success",

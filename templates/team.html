@@ -69,7 +69,7 @@
 <div class="card form-card">
   <form id="lineup-form" method="post" action="{{ url_for('save_team', league_id=league.id) }}">
     <h3>Formación</h3>
-    <p class="muted">Elige tu formación y marca como "Titular" a los {{ total_needed }} jugadores de tu plantilla que quieres alinear ({{ lineup_count }}/{{ total_needed }} marcados ahora mismo).</p>
+    <p class="muted">Elige tu formación; los {{ total_needed }} titulares se cambian haciendo clic en el campo de abajo ({{ lineup_count }}/{{ total_needed }} puestos ahora mismo).</p>
     <div class="checkbox-list formation-list">
       {% for key, shape in formations.items() %}
       <label class="checkbox-item">
@@ -78,13 +78,16 @@
       </label>
       {% endfor %}
     </div>
+    {# Lo mueve team.js cuando nombras capitán desde el campo. Va dentro del
+       formulario para que se envíe con la alineación en el mismo guardado. #}
+    <input type="hidden" name="captain_id" id="captain-id" value="{{ captain_id or '' }}">
     <button class="btn btn-primary" type="submit">Guardar alineación</button>
   </form>
 
   {% if pitch_rows %}
   <div class="card-divider"></div>
   <h3>Alineación en el campo ({{ current_formation }})</h3>
-  <p class="muted">Haz clic en un jugador del campo para cambiarlo por un suplente de su misma posición.</p>
+  <p class="muted">Haz clic en un jugador del campo para cambiarlo por un suplente de su misma posición o para darle el brazalete. El capitán <b>puntúa x{{ captain_multiplier }}</b> esa jornada, para bien y para mal.</p>
   <div class="lineup-layout">
   <div class="pitch">
     <div class="pitch-halfway-line"></div>
@@ -95,7 +98,8 @@
     <div class="pitch-row">
       {% for p in row.slots %}
       {% if p %}
-      <div class="pitch-player" title="Clic para cambiar" data-player-id="{{ p.id }}" data-position="{{ p.posicion }}">
+      <div class="pitch-player{{ ' is-captain' if p.id == captain_id else '' }}" title="Clic para cambiarlo o nombrarlo capitán"
+           data-player-id="{{ p.id }}" data-position="{{ p.posicion }}">
         <div class="pitch-player-badge">
           {% if p.sprite_url %}
             <img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">
@@ -103,6 +107,9 @@
             <span class="pitch-player-placeholder">⚽</span>
           {% endif %}
         </div>
+        {# Fuera del badge a propósito: el badge es redondo y recorta lo que
+           se salga (overflow:hidden), así que dentro no se vería la esquina. #}
+        <span class="captain-badge" title="Capitán: puntúa x{{ captain_multiplier }}">C</span>
         <span class="pitch-player-name">{{ p.nombre.split(' ')[0] }}</span>
       </div>
       {% else %}

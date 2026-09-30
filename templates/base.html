@@ -129,6 +129,60 @@
       });
     })();
 
+    // Copiar al portapapeles cualquier cosa con data-copy (de momento, el
+    // código de invitación de la liga). navigator.clipboard sólo existe en
+    // HTTPS o en localhost, así que hay un respaldo con un textarea oculto
+    // para cuando la página se sirve por HTTP plano (por ejemplo, probando
+    // desde el móvil contra la IP del portátil).
+    (function () {
+      function copiar(texto) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(texto);
+        }
+        return new Promise(function (resolve, reject) {
+          var ta = document.createElement('textarea');
+          ta.value = texto;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed';
+          ta.style.top = '-1000px';
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = false;
+          try { ok = document.execCommand('copy'); } catch (err) { ok = false; }
+          document.body.removeChild(ta);
+          ok ? resolve() : reject(new Error('sin portapapeles'));
+        });
+      }
+
+      function avisar(btn, clase, ms) {
+        btn.classList.remove('is-copied', 'is-copy-failed');
+        btn.classList.add(clase);
+        clearTimeout(btn._copyTimer);
+        btn._copyTimer = setTimeout(function () { btn.classList.remove(clase); }, ms);
+      }
+
+      document.addEventListener('click', function (e) {
+        var btn = e.target && e.target.closest && e.target.closest('[data-copy]');
+        if (!btn) return;
+        e.preventDefault();
+        copiar(btn.dataset.copy).then(function () {
+          avisar(btn, 'is-copied', 1800);
+        }).catch(function () {
+          // Si el navegador no deja copiar, se selecciona el texto para que
+          // al menos se pueda copiar a mano.
+          avisar(btn, 'is-copy-failed', 3000);
+          var code = btn.querySelector('strong');
+          if (code && window.getSelection) {
+            var rango = document.createRange();
+            rango.selectNodeContents(code);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(rango);
+          }
+        });
+      });
+    })();
+
     // Disable the submit button (with a spinner) once a form is actually submitted,
     // so double-clicks (e.g. on a bid) don't send the request twice. Skipped if the
     // submit gets cancelled by a confirm() dialog, and opt-out via data-no-loading.

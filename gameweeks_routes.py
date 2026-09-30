@@ -24,7 +24,13 @@ from discord_notify import (
     format_market_sold_for_discord,
     send_discord_message,
 )
-from league_engine import compute_match_pitch_positions, compute_standings, play_gameweek_for_league, rotate_market_for_league
+from league_engine import (
+    compute_match_pitch_positions,
+    compute_standings,
+    gameweek_best_eleven,
+    play_gameweek_for_league,
+    rotate_market_for_league,
+)
 from scoring import POSITION_LABELS
 
 
@@ -177,7 +183,8 @@ def register_gameweeks_routes(app):
         scores = rows_to_list(
             db.execute(
                 """
-                SELECT gs.user_id, gs.player_id, gs.points, gs.events, p.nombre, p.posicion, p.sprite_url
+                SELECT gs.user_id, gs.player_id, gs.points, gs.events, gs.is_captain,
+                       p.nombre, p.posicion, p.sprite_url
                 FROM gameweek_scores gs JOIN players p ON p.id = gs.player_id
                 WHERE gs.gameweek_id = ?
                 ORDER BY gs.points DESC
@@ -226,6 +233,23 @@ def register_gameweeks_routes(app):
             f["pitch_home"] = compute_match_pitch_positions(home_lineup_data, "home")
             f["pitch_away"] = compute_match_pitch_positions(away_lineup_data, "away")
 
+        # El once ideal se pinta con el mismo campo por filas que la página de
+        # alineación (delanteros arriba, portero abajo), así que se agrupa por
+        # línea en vez de usar el campo horizontal del replay.
+        best_formation, best_eleven, mvp = gameweek_best_eleven(db, league_id, gw["id"])
+        best_rows = []
+        best_ranking = []
+        if best_eleven:
+            for pos in ("FW", "MF", "DF", "GK"):
+                de_esa_linea = [r for r in best_eleven if r["posicion"] == pos]
+                if de_esa_linea:
+                    best_rows.append({"position": pos, "slots": de_esa_linea})
+
+            # Quién ha puesto a cada uno. En el campo sólo cabe el nombre del
+            # equipo, así que debajo va la lista de los once uno a uno, de más
+            # a menos puntos, con su equipo y su entrenador.
+            best_ranking = sorted(best_eleven, key=lambda r: -r["points"])
+
         return render_template(
             "gameweek_detail.html",
             league=league,
@@ -234,6 +258,11 @@ def register_gameweeks_routes(app):
             lineups=lineups,
             market_results=results,
             fixtures=fixtures,
+            best_formation=best_formation,
+            best_eleven=best_eleven,
+            best_rows=best_rows,
+            best_ranking=best_ranking,
+            mvp=mvp,
         )
 
 

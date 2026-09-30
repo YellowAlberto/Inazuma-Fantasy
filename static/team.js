@@ -21,6 +21,23 @@ document.addEventListener('DOMContentLoaded', function () {
     if (existing) existing.remove();
   }
 
+  // --- Capitán -------------------------------------------------------------
+  // El brazalete vive en un input oculto del formulario, así que basta con
+  // moverlo ahí y repintar; se guarda junto con la alineación.
+  var captainInput = document.getElementById('captain-id');
+
+  function captainId() {
+    return captainInput ? parseInt(captainInput.value, 10) || 0 : 0;
+  }
+
+  function setCaptain(playerId) {
+    if (!captainInput) return;
+    captainInput.value = playerId || '';
+    document.querySelectorAll('.pitch-player').forEach(function (s) {
+      s.classList.toggle('is-captain', parseInt(s.dataset.playerId, 10) === playerId);
+    });
+  }
+
   // Como la casilla "Titular" ya no se ve, la carta de la plantilla es ahora
   // la única señal de quién juega: al intercambiar dos jugadores marcamos y
   // desmarcamos su carta en el momento, sin esperar a recargar la página.
@@ -34,7 +51,7 @@ document.addEventListener('DOMContentLoaded', function () {
   function updateSlotVisual(slot, player) {
     slot.dataset.playerId = player.id;
     slot.classList.remove('pitch-slot-empty');
-    slot.title = 'Clic para cambiar';
+    slot.title = 'Clic para cambiarlo o nombrarlo capitán';
 
     var badge = slot.querySelector('.pitch-player-badge');
     badge.classList.remove('pitch-player-badge-empty');
@@ -42,6 +59,16 @@ document.addEventListener('DOMContentLoaded', function () {
       badge.innerHTML = '<img src="' + player.sprite_url + '" alt="' + player.nombre + '">';
     } else {
       badge.innerHTML = '<span class="pitch-player-placeholder">⚽</span>';
+    }
+    // La chapa del capitán cuelga del slot, no del badge (que la recortaría),
+    // así que innerHTML no se la lleva por delante; pero una casilla que
+    // estaba vacía no la tiene todavía.
+    if (!slot.querySelector('.captain-badge')) {
+      var c = document.createElement('span');
+      c.className = 'captain-badge';
+      c.title = 'Capitán';
+      c.textContent = 'C';
+      slot.insertBefore(c, slot.querySelector('.pitch-player-name'));
     }
 
     slot.querySelector('.pitch-player-name').textContent = player.nombre.split(' ')[0];
@@ -319,8 +346,30 @@ document.addEventListener('DOMContentLoaded', function () {
       var popup = document.createElement('div');
       popup.className = 'pitch-swap-popup';
 
+      // El brazalete va primero: es lo que vas a tocar más a menudo una vez
+      // tienes la alineación hecha.
+      if (currentId !== captainId()) {
+        var cap = document.createElement('button');
+        cap.type = 'button';
+        cap.className = 'pitch-swap-item pitch-swap-captain';
+        cap.innerHTML = '<span class="pitch-swap-c">C</span><span>Nombrar capitán</span>';
+        cap.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          setCaptain(currentId);
+          closePopup();
+        });
+        popup.appendChild(cap);
+      }
+
       if (candidates.length === 0) {
-        popup.innerHTML = '<p class="pitch-swap-empty">No tienes suplentes libres en esta posición.</p>';
+        if (!popup.childNodes.length) {
+          popup.innerHTML = '<p class="pitch-swap-empty">No tienes suplentes libres en esta posición.</p>';
+        } else {
+          var nota = document.createElement('p');
+          nota.className = 'pitch-swap-empty';
+          nota.textContent = 'No tienes suplentes libres en esta posición.';
+          popup.appendChild(nota);
+        }
       } else {
         candidates.forEach(function (c) {
           var item = document.createElement('button');
@@ -341,6 +390,10 @@ document.addEventListener('DOMContentLoaded', function () {
             setCardStarter(c.id, true);
 
             updateSlotVisual(slot, c);
+            // Si el que sale llevaba el brazalete, se lo queda el que entra:
+            // si no, el capitán se iría al banquillo y la jornada se jugaría
+            // sin él sin que te enteres.
+            if (captainId() === currentId) setCaptain(c.id);
             renderAffinity();   // el panel se recalcula con el cambio hecho
             closePopup();
           });

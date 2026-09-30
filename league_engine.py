@@ -24,6 +24,7 @@ from core import (
 )
 from scoring import (
     ALL_SEASONS,
+    CAPTAIN_MULTIPLIER,
     DEFAULT_FORMATION,
     FORMATIONS,
     NPC_TEAM_NAMES,
@@ -39,6 +40,132 @@ from scoring import (
     simulate_market_player_points,
     validate_lineup,
 )
+
+
+# Tipos de evento del historial. El icono y el color los pone la plantilla a
+# partir de `kind`, así que el texto guardado no lleva emojis: si algún día
+# cambia el icono de los fichajes no hay que reescribir el historial entero.
+EVENT_KINDS = ("fichaje", "clausula", "venta", "jornada", "liga", "mercado")
+
+
+def log_league_event(db, league_id, kind, text, gameweek_number=None, **meta):
+    """Apunta una línea en el historial de la liga.
+
+    No hace commit: se apunta dentro de la misma transacción que la acción
+    que lo provoca, para que no pueda quedar un fichaje sin su línea (ni una
+    línea de un fichaje que al final falló)."""
+    db.execute(
+        "INSERT INTO league_events (league_id, gameweek_number, kind, text, meta_json) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (league_id, gameweek_number, kind, text, json.dumps(meta, ensure_ascii=False)),
+    )
+
+
+def league_events(db, league_id, limit=60):
+    """Las últimas líneas del historial, de más nueva a más vieja."""
+    rows = db.execute(
+        "SELECT * FROM league_events WHERE league_id = ? ORDER BY id DESC LIMIT ?",
+        (league_id, limit),
+    ).fetchall()
+    out = []
+    for r in rows_to_list(rows):
+        try:
+            r["meta"] = json.loads(r["meta_json"] or "{}")
+        except ValueError:
+            r["meta"] = {}
+        out.append(r)
+    return out
+
+
+def gameweek_best_eleven(db, league_id, gameweek_id):
+    """El once ideal de una jornada: los once jugadores que más puntuaron en
+    TODOS los partidos de esa jornada, con una formación que sea legal.
+
+    Entran los once de cada entrenador de la liga, no sólo los de un partido.
+    Quedan fuera los jugadores que estaban en el mercado (user_id negativo):
+    esos no juegan ningún partido, se les inventa un "rendimiento estimado"
+    para que su marcador de puntos siga creciendo mientras nadie los ficha,
+    y mezclarlos con los que jugaron de verdad llenaba el once ideal de gente
+    que esa jornada no jugó.
+
+    No vale con coger los once mejores a secas, porque saldrían onces
+    imposibles (cinco porteros un día que los porteros puntuaron mucho).
+    Así que prueba las formaciones reales del juego y se queda con la que
+    dé más puntos en total, que es como se elige un once ideal de verdad.
+
+    Devuelve (formacion, jugadores, mvp) o (None, [], None) si esa jornada
+    no tiene puntuaciones todavía."""
+    rows = rows_to_list(
+        db.execute(
+            """
+            SELECT gs.player_id,
+                   -- lo que hizo el jugador, sin el x2 del capitán. Las filas
+                   -- viejas (anteriores al capitán) no tienen base_points, y
+                   -- ahí `points` ya es el valor sin doblar.
+                   COALESCE(NULLIF(gs.base_points, 0), gs.points) AS points,
+                   gs.points AS points_con_capitan,
+                   gs.is_captain, gs.goals, gs.assists,
+                   gs.saves, gs.clean_sheet, gs.events,
+                   p.nombre, p.posicion, p.elemento, p.arquetipo, p.sprite_url,
+                   lm.team_name, u.username, gs.user_id
+            FROM gameweek_scores gs
+            JOIN players p ON p.id = gs.player_id
+            LEFT JOIN league_members lm
+                   ON lm.league_id = gs.league_id AND lm.user_id = gs.user_id
+            LEFT JOIN users u ON u.id = gs.user_id
+            WHERE gs.gameweek_id = ? AND gs.league_id = ? AND gs.user_id > 0
+            """,
+            (gameweek_id, league_id),
+        ).fetchall()
+    )
+    if not rows:
+        return None, [], None
+
+    # El mismo jugador no puede aparecer dos veces en el once, así que si por
+    # lo que sea tuviera dos filas nos quedamos con la mejor.
+    mejor_por_jugador = {}
+    for r in rows:
+        anterior = mejor_por_jugador.get(r["player_id"])
+        if anterior is None or r["points"] > anterior["points"]:
+            mejor_por_jugador[r["player_id"]] = r
+
+    por_posicion = {}
+    for r in mejor_por_jugador.values():
+        por_posicion.setdefault(r["posicion"], []).append(r)
+    for pos in por_posicion:
+        por_posicion[pos].sort(key=lambda r: r["points"], reverse=True)
+
+    def monta(formacion):
+        requisitos = formation_requirements(formacion)
+        elegidos = []
+        for pos, cuantos in requisitos.items():
+            disponibles = por_posicion.get(pos, [])
+            if len(disponibles) < cuantos:
+                return None  # esa jornada no hay gente suficiente en esa línea
+            elegidos.extend(disponibles[:cuantos])
+        return elegidos
+
+    mejor_once, mejor_formacion, mejor_total = None, None, None
+    for formacion in FORMATIONS:
+        once = monta(formacion)
+        if once is None:
+            continue
+        total = sum(r["points"] for r in once)
+        if mejor_total is None or total > mejor_total:
+            mejor_once, mejor_formacion, mejor_total = once, formacion, total
+
+    if mejor_once is None:
+        # Liga muy pequeña o jornada rara: no da ni para una formación legal.
+        return None, [], max(mejor_por_jugador.values(), key=lambda r: r["points"])
+
+    orden = {"GK": 0, "DF": 1, "MF": 2, "FW": 3}
+    mejor_once.sort(key=lambda r: (orden.get(r["posicion"], 9), -r["points"]))
+
+    # El MVP se elige entre TODOS los que jugaron, no sólo entre el once
+    # ideal: si el que más puntuó es un delantero que no entró porque la
+    # formación ganadora sólo llevaba uno, sigue siendo el MVP.
+    mvp = max(mejor_por_jugador.values(), key=lambda r: r["points"])
+    return mejor_formacion, mejor_once, mvp
 
 
 def owned_player_ids(db, league_id):
@@ -333,12 +460,20 @@ def rotate_market_for_league(db, league_id):
                 "SELECT team_name FROM league_members WHERE league_id = ? AND user_id = ?",
                 (league_id, winner["user_id"]),
             ).fetchone()
+            buyer_team = team_row["team_name"] if team_row else "—"
             sold.append(
                 {
                     "player": player_row["nombre"],
-                    "team": team_row["team_name"] if team_row else "—",
+                    "team": buyer_team,
                     "amount": top_amount,
                 }
+            )
+            log_league_event(
+                db, league_id, "fichaje",
+                f"{buyer_team} ficha a {player_row['nombre']} por {round(top_amount)}",
+                gameweek_number=next_number,
+                player_id=pid, user_id=winner["user_id"], amount=round(top_amount),
+                rival_bids=len(bids) - 1,
             )
         else:
             db.execute(
@@ -421,7 +556,7 @@ def play_gameweek_for_league(db, league_id):
     def get_lineup(user_id):
         return rows_to_list(
             db.execute(
-                "SELECT p.* FROM lineup_selections ls JOIN players p ON p.id = ls.player_id "
+                "SELECT p.*, ls.is_captain FROM lineup_selections ls JOIN players p ON p.id = ls.player_id "
                 "WHERE ls.league_id = ? AND ls.user_id = ?",
                 (league_id, user_id),
             ).fetchall()
@@ -436,19 +571,33 @@ def play_gameweek_for_league(db, league_id):
         total_points = missing_penalty
         for p in lineup:
             r = player_results[p["id"]]
-            pts, breakdown = r["points"], r["breakdown"]
+            raw_points, breakdown = r["points"], r["breakdown"]
+
+            # El brazalete dobla lo que saque el jugador, incluso en negativo:
+            # si tu capitán hace un partido desastroso te cuesta el doble.
+            # Las alineaciones de la CPU salen de `SELECT * FROM players` y no
+            # traen la columna, así que nunca llevan brazalete.
+            is_captain = bool(p.get("is_captain"))
+            if is_captain:
+                pts = raw_points * CAPTAIN_MULTIPLIER
+                breakdown = breakdown + [f"🎖️ Capitán (x{CAPTAIN_MULTIPLIER}): {raw_points} → {pts}"]
+            else:
+                pts = raw_points
+
             total_points += pts
 
             if user_id is not None:
                 db.execute(
                     "INSERT INTO gameweek_scores "
                     "(gameweek_id, league_id, user_id, player_id, points, events, "
-                    " goals, assists, saves, steals, interceptions, clearances, key_passes, losses, clean_sheet, blocks) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    " goals, assists, saves, steals, interceptions, clearances, key_passes, losses, clean_sheet, blocks, "
+                    " is_captain, base_points) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         gameweek_id, league_id, user_id, p["id"], pts, "|".join(breakdown),
                         r["goals"], r["assists"], r["saves"], r["steals"], r["interceptions"],
                         r["clearances"], r["key_passes"], r["losses"], r["clean_sheet"], r["blocks"],
+                        1 if is_captain else 0, raw_points,
                     ),
                 )
 
@@ -457,7 +606,10 @@ def play_gameweek_for_league(db, league_id):
                 (league_id, p["id"]),
             ).fetchone()
             current_value = value_row["value"] if value_row else p["price"]
-            new_value = adjust_player_value(current_value, pts, p["price"])
+            # A propósito con los puntos SIN doblar: el mercado tiene que
+            # reflejar cómo jugó el jugador, no a quién le puso el brazalete
+            # su dueño. Si no, nombrarlo capitán le subiría el precio solo.
+            new_value = adjust_player_value(current_value, raw_points, p["price"])
             db.execute(
                 """
                 INSERT INTO league_player_value (league_id, player_id, value) VALUES (?, ?, ?)
@@ -588,8 +740,35 @@ def play_gameweek_for_league(db, league_id):
         )
 
     db.execute("UPDATE leagues SET current_gameweek = ? WHERE id = ?", (next_number, league_id))
+
+    # Una línea de historial por jornada, con quién la ganó. Se saca de
+    # gameweek_totals, que ya está escrito arriba para todos los miembros.
+    mejor = db.execute(
+        "SELECT gt.total_points, lm.team_name FROM gameweek_totals gt "
+        "JOIN league_members lm ON lm.league_id = gt.league_id AND lm.user_id = gt.user_id "
+        "WHERE gt.gameweek_id = ? ORDER BY gt.total_points DESC LIMIT 1",
+        (gameweek_id,),
+    ).fetchone()
+    if mejor:
+        log_league_event(
+            db, league_id, "jornada",
+            f"Jornada {next_number} jugada. La mejor puntuación es de "
+            f"{mejor['team_name']} con {mejor['total_points']} puntos",
+            gameweek_number=next_number, gameweek_id=gameweek_id,
+        )
+    else:
+        log_league_event(
+            db, league_id, "jornada", f"Jornada {next_number} jugada",
+            gameweek_number=next_number, gameweek_id=gameweek_id,
+        )
+
     if next_number >= max_gameweeks:
         db.execute("UPDATE leagues SET ended = 1 WHERE id = ?", (league_id,))
+        log_league_event(
+            db, league_id, "liga",
+            f"La liga ha terminado tras {next_number} jornadas",
+            gameweek_number=next_number,
+        )
 
     # Now that a real jornada has actually been played, give whoever is
     # currently sitting unclaimed in the market a simulated performance for

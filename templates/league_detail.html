@@ -5,7 +5,17 @@
   <div>
     <h1>{{ league.name }}</h1>
     <div class="meta-chips">
-      <span class="meta-chip meta-chip-code">Código <strong>{{ league.invite_code }}</strong></span>
+      <button type="button" class="meta-chip meta-chip-code meta-chip-copy"
+              data-copy="{{ league.invite_code }}"
+              title="Copiar el código para mandárselo a alguien">
+        <span class="copy-label">Código <strong>{{ league.invite_code }}</strong></span>
+        <svg class="copy-icon" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+          <rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M5 15V5a2 2 0 0 1 2-2h10" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span class="copy-flash copy-flash-ok">¡Copiado!</span>
+        <span class="copy-flash copy-flash-ko">Cópialo a mano</span>
+      </button>
       <span class="meta-chip">Presupuesto <strong>{{ league.budget|euros }}</strong></span>
       <span class="meta-chip">Jornada <strong>{{ league.current_gameweek }}</strong></span>
       <span class="meta-chip">Temporadas <strong>{{ seasons_label }}</strong></span>
@@ -19,7 +29,7 @@
 
 <div class="tab-links">
   <a href="{{ url_for('market', league_id=league.id) }}" class="btn btn-primary">Mercado de fichajes</a>
-  <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">Mi equipo ({{ squad_count }} en plantilla)</a>
+  <a href="{{ url_for('team', league_id=league.id) }}" class="btn btn-secondary">Mi equipo</a>
   <a href="{{ url_for('standings', league_id=league.id) }}" class="btn btn-secondary">Clasificación</a>
   <a href="{{ url_for('gameweeks', league_id=league.id) }}" class="btn btn-secondary">Jornadas</a>
   {% if is_creator %}<a href="{{ url_for('league_settings', league_id=league.id) }}" class="btn btn-secondary tab-settings">Ajustes</a>{% endif %}
@@ -38,6 +48,41 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
+
+{# Historial: todo lo que ha pasado en la liga, de lo más reciente a lo más
+   antiguo. El icono y el color salen del `kind` guardado, no del texto, para
+   poder cambiarlos sin reescribir las líneas ya guardadas. #}
+{% set event_icons = {
+     'fichaje':  '💰',
+     'clausula': '⚡',
+     'venta':    '↩️',
+     'jornada':  '⚽',
+     'liga':     '🏆',
+     'mercado':  '🛒'
+   } %}
+<h2 class="section-title">Historial de la liga</h2>
+<div class="card">
+  {% if events %}
+  <ol class="league-feed">
+    {% for e in events %}
+    <li class="feed-item feed-{{ e.kind }}">
+      <span class="feed-icon">{{ event_icons.get(e.kind, '•') }}</span>
+      <div class="feed-body">
+        <p class="feed-text">{{ e.text }}</p>
+        <p class="feed-meta">
+          {% if e.gameweek_number %}Jornada {{ e.gameweek_number }} · {% endif %}
+          <span class="feed-date" title="{{ e.created_at }} UTC">{{ e.created_at | hace }}</span>
+          {% if e.meta.rival_bids %} · {{ e.meta.rival_bids }} puja{{ 's' if e.meta.rival_bids != 1 }} rival{{ 'es' if e.meta.rival_bids != 1 }}{% endif %}
+        </p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="muted">Todavía no ha pasado nada en esta liga. En cuanto se cierre
+  un mercado o se juegue una jornada, lo verás aquí.</p>
+  {% endif %}
 </div>
 
 {% endblock %}

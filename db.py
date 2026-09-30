@@ -168,7 +168,9 @@ CREATE TABLE IF NOT EXISTS gameweek_scores (
     key_passes INTEGER NOT NULL DEFAULT 0,
     losses INTEGER NOT NULL DEFAULT 0,
     clean_sheet INTEGER NOT NULL DEFAULT 0,
-    blocks INTEGER NOT NULL DEFAULT 0
+    blocks INTEGER NOT NULL DEFAULT 0,
+    is_captain INTEGER NOT NULL DEFAULT 0,
+    base_points INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS gameweek_totals (
@@ -198,6 +200,25 @@ CREATE TABLE IF NOT EXISTS fixtures (
     home_formation TEXT NOT NULL DEFAULT '4-4-2',
     away_formation TEXT NOT NULL DEFAULT '4-4-2'
 );
+
+-- Historial de la liga: una línea por cosa que pasa (fichajes, cláusulas,
+-- ventas, jornadas jugadas...). Es sólo para leer, así que se guarda ya
+-- redactado en `text` en vez de reconstruirlo luego juntando cinco tablas:
+-- el jugador o el usuario pueden desaparecer de la liga y la línea del
+-- historial tiene que seguir contando lo que pasó. `meta_json` lleva los
+-- ids por si algún día hace falta enlazar.
+CREATE TABLE IF NOT EXISTS league_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    league_id INTEGER NOT NULL,
+    gameweek_number INTEGER,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    meta_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_league_events_league
+    ON league_events (league_id, id DESC);
 
 -- Modo Draft diario (sobres estilo FUT): un intento por usuario y día.
 CREATE TABLE IF NOT EXISTS drafts (
@@ -374,6 +395,34 @@ def _run_migrations(conn):
         conn.execute("ALTER TABLE players ADD COLUMN tecnicas_por_tipo TEXT NOT NULL DEFAULT '{}'")
     if "es_scout" not in player_cols:
         conn.execute("ALTER TABLE players ADD COLUMN es_scout INTEGER NOT NULL DEFAULT 0")
+
+    # Capitán: quién lleva el brazalete en la alineación guardada, y quién lo
+    # llevaba en cada jornada ya jugada. Lo segundo se guarda aparte porque la
+    # alineación cambia cada semana y el resultado de una jornada pasada tiene
+    # que seguir enseñando el brazalete de aquel día, no el de hoy.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS league_events ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " league_id INTEGER NOT NULL,"
+        " gameweek_number INTEGER,"
+        " kind TEXT NOT NULL,"
+        " text TEXT NOT NULL,"
+        " meta_json TEXT NOT NULL DEFAULT '{}',"
+        " created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
+    )
+
+    lineup_cols = [row["name"] for row in conn.execute("PRAGMA table_info(lineup_selections)").fetchall()]
+    if "is_captain" not in lineup_cols:
+        conn.execute("ALTER TABLE lineup_selections ADD COLUMN is_captain INTEGER NOT NULL DEFAULT 0")
+
+    score_cols = [row["name"] for row in conn.execute("PRAGMA table_info(gameweek_scores)").fetchall()]
+    if "is_captain" not in score_cols:
+        conn.execute("ALTER TABLE gameweek_scores ADD COLUMN is_captain INTEGER NOT NULL DEFAULT 0")
+    # `points` lleva ya el x2 del capitán, que es lo que suma al equipo. Para
+    # el once ideal hace falta lo que hizo el jugador de verdad, así que se
+    # guarda aparte en vez de deducirlo dividiendo.
+    if "base_points" not in score_cols:
+        conn.execute("ALTER TABLE gameweek_scores ADD COLUMN base_points INTEGER NOT NULL DEFAULT 0")
 
     _backfill_sprites_from_seed(conn)
     _backfill_techniques_from_seed(conn)

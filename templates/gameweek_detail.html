@@ -106,6 +106,80 @@
 <div class="card"><p class="empty-state">No hubo partidos registrados esta jornada.</p></div>
 {% endif %}
 
+{% if mvp %}
+<h2 class="section-title">Once ideal y MVP</h2>
+<div class="card">
+  <div class="mvp-row">
+    <div class="mvp-badge">
+      {% if mvp.sprite_url %}<img src="{{ mvp.sprite_url }}" alt="{{ mvp.nombre }}">{% else %}<span>⚽</span>{% endif %}
+    </div>
+    <div class="mvp-info">
+      <span class="mvp-label">MVP de la jornada</span>
+      <h3 class="mvp-name">{{ mvp.nombre }}</h3>
+      <p class="mvp-meta">
+        {{ mvp.posicion }}{% if mvp.team_name %} · {{ mvp.team_name }}{% if mvp.username %} <span class="mvp-user">({{ mvp.username }})</span>{% endif %}{% else %} · sin dueño{% endif %}
+        {% if mvp.goals %} · {{ mvp.goals }} gol{{ 'es' if mvp.goals != 1 }}{% endif %}
+        {% if mvp.assists %} · {{ mvp.assists }} asistencia{{ 's' if mvp.assists != 1 }}{% endif %}
+        {% if mvp.saves %} · {{ mvp.saves }} parada{{ 's' if mvp.saves != 1 }}{% endif %}
+      </p>
+    </div>
+    <div class="mvp-points"><strong>{{ mvp.points }}</strong><span>pts</span></div>
+  </div>
+
+  {% if best_rows %}
+  <div class="card-divider"></div>
+  <h3>Once ideal ({{ best_formation }})</h3>
+  {# Puntos SIN el x2 del capitán a propósito: el once ideal mide cómo jugó
+     cada uno, no a quién le puso el brazalete su entrenador. #}
+  <p class="muted">Los once que mejor jugaron esta jornada, sean de quien sean. Los puntos son los del jugador, sin contar el brazalete de capitán.</p>
+  <div class="pitch">
+    <div class="pitch-halfway-line"></div>
+    <div class="pitch-center-circle"></div>
+    <div class="pitch-box pitch-box-top"></div>
+    <div class="pitch-box pitch-box-bottom"></div>
+    {% for row in best_rows %}
+    <div class="pitch-row">
+      {% for p in row.slots %}
+      <div class="pitch-player pitch-player-static"
+           title="{{ p.nombre }} · {{ p.points }} pts · {{ p.team_name or 'sin equipo' }}{% if p.username %} ({{ p.username }}){% endif %}">
+        <div class="pitch-player-badge">
+          {% if p.sprite_url %}<img src="{{ p.sprite_url }}" alt="{{ p.nombre }}">{% else %}<span class="pitch-player-placeholder">⚽</span>{% endif %}
+        </div>
+        <span class="pitch-player-name">{{ p.nombre.split(' ')[0] }}</span>
+        <span class="best-pts">{{ p.points }}</span>
+        <span class="best-team">{{ p.team_name or 'sin equipo' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {# En el campo sólo cabe el nombre del equipo (y en el móvil ni eso, se
+     corta). Aquí van los once uno a uno, de más a menos puntos, con su
+     equipo y su entrenador. #}
+  <ol class="best-list">
+    {% for p in best_ranking %}
+    <li class="best-list-item">
+      <span class="best-list-rank">{{ loop.index }}</span>
+      {% if p.sprite_url %}
+        <img class="best-list-sprite" src="{{ p.sprite_url }}" alt="">
+      {% else %}
+        <span class="best-list-sprite best-list-sprite-empty">⚽</span>
+      {% endif %}
+      <span class="best-list-name">{{ p.nombre }}</span>
+      <span class="best-list-pos">{{ p.posicion }}</span>
+      <span class="best-list-owner">
+        <a href="{{ url_for('view_member_team', league_id=league.id, user_id=p.user_id) }}">{{ p.team_name or 'Sin equipo' }}</a>
+        {% if p.username %}<span class="best-list-user">{{ p.username }}</span>{% endif %}
+      </span>
+      <span class="best-list-pts">{{ p.points }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>
+{% endif %}
+
 <h2 class="section-title">Puntos fantasy por equipo</h2>
 <div class="card">
   <table class="simple-table standings-table">

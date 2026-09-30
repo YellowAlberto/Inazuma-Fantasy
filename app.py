@@ -34,6 +34,7 @@ from core import (
     element_icon,
     element_label,
     euromillions_filter,
+    hace_filter,
     euros_filter,
     inject_user,
     value_tier,
@@ -52,6 +53,7 @@ app.context_processor(inject_user)
 app.template_filter("display_season")(display_season_filter)
 app.template_filter("euros")(euros_filter)
 app.template_filter("euromillions")(euromillions_filter)
+app.template_filter("hace")(hace_filter)
 app.template_filter("element_label")(element_label)
 app.template_filter("element_icon")(element_icon)
 app.template_filter("archetype_icon")(archetype_icon)

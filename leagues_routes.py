@@ -25,6 +25,8 @@ from league_engine import (
     ensure_league_pool,
     generate_invite_code,
     generate_round_robin_schedule,
+    league_events,
+    log_league_event,
     refresh_league_market,
     regenerate_league_schedule,
 )
@@ -127,6 +129,7 @@ def register_leagues_routes(app):
         league = row_to_dict(db.execute("SELECT * FROM leagues WHERE id = ?", (league_id,)).fetchone())
         refresh_league_market(db, league)
         assign_starting_roster(db, league, session["user_id"])
+        log_league_event(db, league_id, "liga", f"{team_name} crea la liga", user_id=session["user_id"])
         db.commit()
         flash(f"¡Liga '{name}' creada! Código de invitación: {code}. Te hemos asignado un equipo inicial GRATIS y equilibrado.", "success")
         return redirect(url_for("team", league_id=league_id, new_squad=1))
@@ -168,6 +171,10 @@ def register_leagues_routes(app):
         )
         assign_starting_roster(db, league, session["user_id"])
         regenerate_league_schedule(db, league["id"], member_count + 1)
+        log_league_event(
+            db, league["id"], "liga", f"{team_name} se une a la liga",
+            gameweek_number=league["current_gameweek"], user_id=session["user_id"],
+        )
         db.commit()
         flash("¡Te has unido a la liga! Te hemos asignado un equipo inicial GRATIS y equilibrado.", "success")
         return redirect(url_for("team", league_id=league["id"], new_squad=1))
@@ -194,11 +201,6 @@ def register_leagues_routes(app):
                 (league_id,),
             ).fetchall()
         )
-        squad_count = db.execute(
-            "SELECT COUNT(*) as c FROM rosters WHERE league_id = ? AND user_id = ?",
-            (league_id, session["user_id"]),
-        ).fetchone()["c"]
-
         seasons = league_seasons_list(league)
         champion = None
         if league["ended"]:
@@ -210,10 +212,10 @@ def register_leagues_routes(app):
             league=league,
             members=members,
             is_creator=league["creator_id"] == session["user_id"],
-            squad_count=squad_count,
             seasons_label="Todas las temporadas" if not seasons else ", ".join(sorted(set(season_label_es(season_group_label(j)) for j in seasons))),
             max_league_members=MAX_LEAGUE_MEMBERS,
             champion=champion,
+            events=league_events(db, league_id, limit=40),
         )
 
 

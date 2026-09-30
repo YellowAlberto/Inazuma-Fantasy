@@ -123,6 +123,10 @@ def formation_requirements(formation_key):
 # ("⚽ 2 goles · 🅰️ 1 asistencia") in the gameweek results screen.
 # ---------------------------------------------------------------------------
 APPEARANCE_POINTS = 2
+# El capitán puntúa doble. Es la apuesta de la jornada: si tu estrella cuaja
+# te dispara el total, y si desaparece del partido no te devuelve nada, así
+# que elegirlo importa tanto como montar la alineación.
+CAPTAIN_MULTIPLIER = 2
 ASSIST_POINTS = 3
 GOAL_POINTS = {"GK": 6, "DF": 6, "MF": 5, "FW": 4}  # same scale LaLiga Fantasy MARCA uses
 KEY_PASS_GOAL_CHANCE_BONUS = 0.1  # small boost if the exact receiver shoots on their team's very next play
