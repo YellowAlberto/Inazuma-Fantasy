@@ -180,6 +180,19 @@ def element_duel_bonus(attacker_element, defender_element):
 # ---------------------------------------------------------------------------
 SUPER_TECHNIQUE_CHANCE = 0.05
 
+# Puntos por cada súper técnica que saque un jugador, sea del tipo que sea.
+# Medido sobre 500 partidos: un jugador hace una en el 13,5% de los partidos,
+# dos en el 1,1% y tres en el 0,1%, así que es un premio a algo que de verdad
+# pasa poco. A +2 sube la media del equipo en unos 3 puntos por partido, que
+# se nota en el marcador sin descolocar el resto del juego.
+#
+# Ojo: algunas ya cobran por su lado (una súper técnica de tiro que acaba en
+# gol cobra el gol, una de portería cobra la parada). Estos 2 puntos van
+# encima, a propósito: premian la jugada en sí. El regate era el único tipo
+# que no daba absolutamente nada, y ahora también cuenta.
+SUPER_TECHNIQUE_POINTS = 2
+SUPER_TECHNIQUE_POINTS_CAP = 3  # en 500 partidos nadie paso de 3, es un seguro
+
 
 def roll_super_technique(player, category):
     """A small, flat chance that this player pulls off a super técnica this
@@ -346,7 +359,8 @@ def simulate_market_player_points(player):
 class _PlayerLog:
     """Accumulates raw match events for one player as the simulation runs."""
 
-    __slots__ = ("player", "goals", "assists", "saves", "steals", "losses", "key_passes", "clearances", "interceptions", "blocks")
+    __slots__ = ("player", "goals", "assists", "saves", "steals", "losses", "key_passes",
+                 "clearances", "interceptions", "blocks", "super_techniques")
 
     def __init__(self, player):
         self.player = player
@@ -359,6 +373,7 @@ class _PlayerLog:
         self.clearances = 0
         self.interceptions = 0
         self.blocks = 0
+        self.super_techniques = 0
 
 
 def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marking_memory=False):
@@ -596,6 +611,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 if defender_technique:
                     log = other["logs"][defender["id"]]
                     log.steals += 1
+                    log.super_techniques += 1
                     side["logs"][attacker["id"]].losses += 1
                     shift_momentum(other_key)
                     ball_y = other["y_positions"].get(defender["id"], ball_y)
@@ -609,6 +625,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                         ))
                 elif attacker_technique:
                     # Guaranteed dribble: the attacker keeps the ball with flair.
+                    side["logs"][attacker["id"]].super_techniques += 1
                     side["last_passer"] = attacker
                     side["possessor_id"] = attacker["id"]
                     timeline.append((
@@ -772,6 +789,8 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
             if blocker:
                 log = other["logs"][blocker["id"]]
                 log.blocks += 1
+                if block_technique:
+                    log.super_techniques += 1
                 shift_momentum(other_key)
                 ball_y = other["y_positions"].get(blocker["id"], ball_y)
                 side["possessor_id"] = None
@@ -868,6 +887,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                     assist_name = provider["nombre"]
                     assist_id = provider["id"]
                 if shot_technique:
+                    side["logs"][attacker["id"]].super_techniques += 1
                     timeline.append((
                         minute,
                         f"✨ ¡SÚPER TÉCNICA! ¡GOL! {attacker['nombre']} anota con {shot_technique}{assist_note} ({side['label']})",
@@ -892,6 +912,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 side["possessor_id"] = None
                 other["possessor_id"] = gk["id"]
                 if save_technique:
+                    other["logs"][gk["id"]].super_techniques += 1
                     timeline.append((
                         minute,
                         f"✨ ¡SÚPER TÉCNICA! {gk['nombre']} detiene el disparo con {save_technique} ({other['label']})",
@@ -987,6 +1008,14 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 if pts:
                     points += pts
                     breakdown.append(f"🚧 {log.blocks} bloqueo{'s' if log.blocks > 1 else ''} (+{pts})")
+            if log.super_techniques:
+                counted = min(log.super_techniques, SUPER_TECHNIQUE_POINTS_CAP)
+                pts = counted * SUPER_TECHNIQUE_POINTS
+                points += pts
+                breakdown.append(
+                    f"✨ {log.super_techniques} súper técnica"
+                    f"{'s' if log.super_techniques > 1 else ''} (+{pts})"
+                )
             clean_sheet_applied = False
             if clean_sheet and CLEAN_SHEET_POINTS[pos] > 0:
                 points += CLEAN_SHEET_POINTS[pos]
@@ -1015,6 +1044,7 @@ def simulate_fixture(home_lineup, home_label, away_lineup, away_label, use_marki
                 "blocks": log.blocks,
                 "key_passes": log.key_passes,
                 "losses": log.losses,
+                "super_techniques": log.super_techniques,
                 "clean_sheet": 1 if clean_sheet_applied else 0,
             }
             total_points += points

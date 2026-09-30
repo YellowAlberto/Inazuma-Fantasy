@@ -251,6 +251,7 @@ CLAUSE_LEAGUE_AGE_DAYS = 7  # clauses can't be paid off until a league is at lea
 
 LEADERBOARD_CATEGORIES = [
     ("points", "🏆 Más puntos totales"),
+    ("super_techniques", "✨ Súper técnicas"),
     ("goals", "⚽ Goleadores"),
     ("assists", "🅰️ Asistencias"),
     ("saves", "🧤 Paradas"),

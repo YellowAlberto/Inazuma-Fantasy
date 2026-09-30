@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS gameweek_scores (
     clean_sheet INTEGER NOT NULL DEFAULT 0,
     blocks INTEGER NOT NULL DEFAULT 0,
     is_captain INTEGER NOT NULL DEFAULT 0,
-    base_points INTEGER NOT NULL DEFAULT 0
+    base_points INTEGER NOT NULL DEFAULT 0,
+    super_techniques INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS gameweek_totals (
@@ -423,6 +424,8 @@ def _run_migrations(conn):
     # guarda aparte en vez de deducirlo dividiendo.
     if "base_points" not in score_cols:
         conn.execute("ALTER TABLE gameweek_scores ADD COLUMN base_points INTEGER NOT NULL DEFAULT 0")
+    if "super_techniques" not in score_cols:
+        conn.execute("ALTER TABLE gameweek_scores ADD COLUMN super_techniques INTEGER NOT NULL DEFAULT 0")
 
     _backfill_sprites_from_seed(conn)
     _backfill_techniques_from_seed(conn)
